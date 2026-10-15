@@ -98,6 +98,7 @@
   }
   async function switchTab(next: string) {
     tab = next;
+    if (next !== 'tokens') newToken = '';
     await action(async () => {
       if (next === 'tokens') tokens = await api.tokens();
       if (next === 'health') health = await api.health();

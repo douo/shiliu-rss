@@ -1288,9 +1288,6 @@ kbd {
   .list-actions .text-button > span {
     font-size: 10px;
   }
-  .list-actions .icon-button {
-    display: none;
-  }
   .article-list {
     padding: 0 22px;
   }

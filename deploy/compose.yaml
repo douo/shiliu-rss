@@ -31,3 +31,9 @@ services:
         max-size: 5m
         max-file: "3"
     stop_grace_period: 45s
+    healthcheck:
+      test: [CMD, /reader, healthcheck]
+      interval: 60s
+      timeout: 6s
+      start_period: 15s
+      retries: 3

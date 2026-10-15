@@ -1,0 +1,5 @@
+*
+!dist/
+!dist/reader-linux-amd64
+!deploy/
+!deploy/Dockerfile
