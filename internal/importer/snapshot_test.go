@@ -272,6 +272,39 @@ func TestBackupRestoreCleansExpiredContentAndRotates(t *testing.T) {
 	}
 }
 
+func TestBackupRestoreWithRelativePaths(t *testing.T) {
+	t.Chdir(t.TempDir())
+	ctx := context.Background()
+	now := time.Date(2026, 10, 15, 8, 0, 0, 0, time.UTC)
+	svc, _ := newService(t, &now)
+	if _, err := Import(ctx, bytes.NewReader(syntheticSnapshot(t, false)), svc, ImportOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	backup, err := Backup(ctx, svc, filepath.Join("backups?#", "pre-sample"), now)
+	if err != nil {
+		t.Fatalf("relative backup: %v", err)
+	}
+	if filepath.IsAbs(backup) {
+		t.Fatalf("backup changed the caller's relative output path: %s", backup)
+	}
+	destination := filepath.Join("restored?#", "reader.db")
+	if err := Restore(ctx, backup, destination, now); err != nil {
+		t.Fatalf("relative restore: %v", err)
+	}
+	restored, err := store.Open(ctx, destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer restored.Close()
+	var articles int
+	if err := restored.Read.QueryRowContext(ctx, `SELECT count(*) FROM articles`).Scan(&articles); err != nil {
+		t.Fatal(err)
+	}
+	if articles != 3 {
+		t.Fatalf("restored article count = %d, want 3", articles)
+	}
+}
+
 func TestSchemaProbeRejectsMissingRequiredColumns(t *testing.T) {
 	cols := schema{}
 	for table, fields := range required {

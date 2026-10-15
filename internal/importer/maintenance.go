@@ -84,7 +84,13 @@ func Backup(ctx context.Context, s *app.Service, dir string, now time.Time) (str
 }
 func verifyDatabase(ctx context.Context, path string) error {
 	// Read-only checks do not silently migrate an old or corrupt backup.
-	dsn := url.URL{Scheme: "file", Path: filepath.ToSlash(path), RawQuery: "mode=ro"}
+	// A relative URL.Path is serialized as a file URI authority instead of a
+	// local relative filename. Resolve it before encoding reserved characters.
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	dsn := url.URL{Scheme: "file", Path: filepath.ToSlash(absolute), RawQuery: "mode=ro"}
 	db, err := sql.Open("sqlite", dsn.String())
 	if err != nil {
 		return err
