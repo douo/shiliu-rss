@@ -29,7 +29,7 @@ make run
 ## 已实现
 
 - RSS / Atom / JSON Feed、分类、OPML、源设置与健康；默认 5 小时 ±1 小时自动检查，条件请求、退避、持久任务/租约、重启恢复与同站限流。
-- 近期/未读/收藏/归档、中文及英文搜索、手机布局、键盘操作、笔记/标签/Agent 摘要。新内容提示后主动更新列表，保留阅读位置。
+- 近期/未读/收藏/归档、中文及英文搜索、可折叠侧栏、来源图标与跳转、分类及成员管理、手机布局、Alt+Shift 组合键、笔记/标签/Agent 摘要。新内容提示后主动更新列表，保留阅读位置。
 - 隐藏与清正文分开；普通源 90 天、收藏及长期源豁免、迁入正文 30 天保护；清理同时处理衍生文本和索引，普通轮询不会填回已清正文。
 - 仅显式全文获取；失败保留已有内容。HTML 净化、出站地址检查、体积/并发限制、严格脚本 CSP、gzip 静态资源。
 - 本人密码/会话、独立可撤销 scoped token、稳定分页、增量 changes、事务幂等、版本与内容依据冲突检查。
@@ -41,7 +41,7 @@ make run
 make check-generated  # OpenAPI → Go/TS 生成漂移
 make check            # go vet + Svelte/TypeScript
 make test             # Go race / SQLite / 抓取 / API / 调度 / 导入恢复
-make test-web         # 先停 dev/run；隔离临时库启动 Go 静态成品，18 项浏览器验收
+make test-web         # 先停 dev/run；隔离临时库启动 Go 静态成品，34 项浏览器验收
 make build-linux      # 本机静态交叉编译 Linux AMD64 v1
 ```
 
