@@ -2,7 +2,7 @@
 
 一个自托管的个人 RSS 阅读器：可靠后台更新，清爽阅读，按源保存，正式 Agent API。Go + SQLite 单进程，Svelte 5 / TypeScript / SvelteKit 静态前端，Tailwind CSS 4。图标使用 [抽象石榴 SVG](assets/icon.svg)。
 
-**首版及内置 Agent 已实现并完成本机验证（2026-10-16）。** 用户已授权正式部署 NAS、全量迁移并切换 Miniflux；执行结果记录在实施验收与生产运行记录。已实现的功能及验证边界见 [实施验收记录](docs/implementation.md)。
+**首版及内置 Agent 已实现并完成本机验证（2026-10-16）。** 已正式部署到 NAS，并完成 Miniflux 全量迁移与入口切换。入口 **https://reader.example.com**，报告与对话在 **/agent**；详情见 [生产记录](docs/production.md)。已实现的功能及验证边界见 [实施验收记录](docs/implementation.md)。
 
 ## 本机启动
 

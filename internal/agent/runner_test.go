@@ -282,3 +282,104 @@ func TestRealProviderSyntheticReport(t *testing.T) {
 	}
 	t.Logf("Responses conversation complete: %d blocks", len(reply.Result.Blocks))
 }
+
+func TestMalformedArticleDoesNotStopOtherReportMembers(t *testing.T) {
+	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req struct {
+			Input string `json:"input"`
+		}
+		if e := json.NewDecoder(r.Body).Decode(&req); e != nil {
+			t.Error(e)
+			return
+		}
+		var input struct {
+			Articles []struct {
+				ID string `json:"article_id"`
+			} `json:"articles"`
+			Evidence []Evidence `json:"evidence"`
+		}
+		if e := json.Unmarshal([]byte(req.Input), &input); e != nil {
+			t.Error(e)
+			return
+		}
+		var output any
+		if len(input.Articles) > 0 {
+			for _, a := range input.Articles {
+				if a.ID == "2" || a.ID == "4" {
+					json.NewEncoder(w).Encode(map[string]any{"output_text": "invalid synthetic JSON", "usage": map[string]int{"total_tokens": 10}})
+					return
+				}
+			}
+			cards := []ArticleCard{}
+			for _, a := range input.Articles {
+				refs := []string{}
+				for _, e := range input.Evidence {
+					if e.ArticleID == a.ID {
+						refs = append(refs, e.ID)
+					}
+				}
+				cards = append(cards, ArticleCard{ArticleID: a.ID, Status: "ok", Points: []ArticlePoint{{Text: "合成资料讨论增量索引。", EvidenceIDs: refs}}, Limitation: ""})
+			}
+			output = Batch{Version: "1", Articles: cards}
+		} else {
+			refs := []string{}
+			for _, e := range input.Evidence {
+				refs = append(refs, e.ID)
+			}
+			output = Narrative{Version: "1", Blocks: []Point{{Kind: "analysis", Text: "部分合成资料无法生成摘要。", EvidenceIDs: refs}}}
+		}
+		b, _ := json.Marshal(output)
+		json.NewEncoder(w).Encode(map[string]any{"output_text": string(b), "usage": map[string]int{"total_tokens": 10}})
+	}))
+	defer provider.Close()
+	r, s := fixture(t, provider.URL)
+	ctx := context.Background()
+	f, e := s.CreateFeed(ctx, app.Feed{URL: "https://example.invalid/normal", Paused: true})
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, e = s.IngestFeed(ctx, f.ID, []app.FeedEntry{{GUID: "one", Title: "合成甲", Text: "索引资料"}, {GUID: "two", Title: "合成乙", Text: "索引资料"}, {GUID: "three", Title: "合成丙", Text: "索引资料"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	high, e := s.CreateFeed(ctx, app.Feed{URL: "https://example.invalid/high", Paused: true, Importance: "high"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	ids, e := s.IngestFeed(ctx, high.ID, []app.FeedEntry{{GUID: "four", Title: "合成全文", URL: "https://example.invalid/article", Text: "摘要"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, e = s.QueueFulltext(ctx, ids[0])
+	if e != nil {
+		t.Fatal(e)
+	}
+	job, e := s.ClaimJob(ctx, "fixture", time.Minute)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if e = s.CompleteFulltextJob(ctx, job.ID, "fixture", app.FulltextResult{Text: "完整合成文章"}); e != nil {
+		t.Fatal(e)
+	}
+	run, e := s.QueueAgentRun(ctx, "report", "{}", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	done := drain(t, r, run.ID)
+	if done.State != "partial" || done.Completed != 4 || done.Result.Counts["pending"] != 0 || done.Result.Counts["fallback"] != 2 || done.Result.Counts["summarized"] != 2 {
+		t.Fatalf("isolated failure: %+v", done)
+	}
+	members, e := s.AgentMembers(ctx, run.ID, "", "", 50, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, m := range members {
+		if m.State == "fallback" && (m.Depth != "title" || m.Error != "invalid_model_output" || len(m.Card[0].Citations) != 1) {
+			t.Fatal("fallback claims unsupported coverage", m)
+		}
+		a, e := s.GetArticle(ctx, m.ArticleID)
+		if e != nil || a.ReadAt != nil {
+			t.Fatal("reading state changed", e)
+		}
+	}
+}

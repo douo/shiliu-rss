@@ -1,6 +1,6 @@
 # 产品模块与需求
 
-版本：**已确认的首版需求基线 v1.0，附 R-18 及 2026-10-15 内置 Agent 增补 R-19–R-23**。首版接口与本机验证已完成，内置 Agent 已完成配置、晨报与对话的实现及本机验证，验收范围和质量限制见 docs/implementation.md。工程选择见 [技术选型](technology.md)、[架构设计](architecture.md) 与 [Agent 系统设计](agent-design.md)；NAS 部署和运行指标尚未验证。
+版本：**已确认的首版需求基线 v1.0，附 R-18 及 2026-10-15 内置 Agent 增补 R-19–R-23**。首版接口与本机验证已完成，内置 Agent 已完成配置、晨报与对话的实现及本机验证，验收范围和质量限制见 docs/implementation.md。工程选择见 [技术选型](technology.md)、[架构设计](architecture.md) 与 [Agent 系统设计](agent-design.md)；NAS已正式部署；完整运行性能/功耗指标仍未验证，见production.md。
 
 ## 产品目标
 

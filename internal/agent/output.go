@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"shiliu-rss/internal/app"
@@ -25,7 +26,7 @@ var narrativePrompt string
 //go:embed prompts/answer.txt
 var answerPrompt string
 
-const promptVersion = "shiliu-agent/2"
+const promptVersion = "shiliu-agent/3"
 
 var ErrFormat = errors.New("invalid_model_output")
 
@@ -91,7 +92,7 @@ func blocks(points []Point, ev []Evidence) ([]app.AgentBlock, error) {
 			return nil, ErrFormat
 		}
 		if strings.TrimSpace(p.Text) == "" || len([]rune(p.Text)) > 2000 || strings.ContainsAny(p.Text, "<>") || strings.Contains(strings.ToLower(p.Text), "http:") || strings.Contains(strings.ToLower(p.Text), "https:") || strings.Contains(p.Text, "](") {
-			return nil, ErrFormat
+			return nil, fmt.Errorf("%w: text must be short plain text without angle brackets, URLs or Markdown links", ErrFormat)
 		}
 		if len(p.EvidenceIDs) > 40 || p.EvidenceIDs == nil {
 			return nil, ErrFormat
@@ -111,7 +112,7 @@ func blocks(points []Point, ev []Evidence) ([]app.AgentBlock, error) {
 				runes := []rune(p.Text)
 				for start := 0; start+120 <= len(runes); start += 40 {
 					if strings.Contains(e.Text, string(runes[start:start+120])) {
-						return nil, ErrFormat
+						return nil, fmt.Errorf("%w: paraphrase instead of copying 120 consecutive source characters", ErrFormat)
 					}
 				}
 			}

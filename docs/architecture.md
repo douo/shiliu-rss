@@ -1,6 +1,6 @@
 # 首版架构
 
-日期：2026-10-15。状态：首版实现与本机验证已完成，NAS部署待后续执行。遵守 [产品基线](product.md)；技术组合与取舍见 [技术选型](technology.md)。本文件规定模块边界和关键不变量，具体 SQL 在 migrations/，契约在 api/openapi.yaml，启动命令见 README/Makefile。
+日期：2026-10-15。状态：首版实现与本机验证已完成，2026-10-16已部署NAS并切换Miniflux，生产事实见production.md。遵守 [产品基线](product.md)；技术组合与取舍见 [技术选型](technology.md)。本文件规定模块边界和关键不变量，具体 SQL 在 migrations/，契约在 api/openapi.yaml，启动命令见 README/Makefile。
 
 **本次架构增补：** R-19–R-23 将 Agent 从外部 API 调用方扩展为系统内置模块。完整新架构见 [Agent 系统设计](agent-design.md)，状态为设计稿，尚未增加实际SQL/OpenAPI或运行功能。下列首版的身份/scope描述记录既有实现，本次不据此新增 Agent 权限系统。
 
@@ -110,7 +110,7 @@ first_seen_at 优先源系统 created_at；确实缺失时用固定导入时间�
 
 以 `(source_instance,entity_type,source_id)` 去重，重跑同批不刷新 imported_at 或 30 天保护期。同步已有身份别名，使后续正常 RSS 轮询能匹配迁入条目；旧 ID 与新 GUID/URL 的映射冲突必须报告。迁移后正文统一净化并建立索引。
 
-先预览再导入，核对分类、订阅、文章、已读、收藏、关联、样本内容、时间兜底和不兼容配置；再运行重复导入与真实 feed 重抓去重验证。旧系统在演练期间照常运行；正式切换再安排稳定窗口/最终差量核对，未对齐期间不把新库当成唯一权威。本轮未导出私人数据、迁移或切换。
+先预览再导入，核对分类、订阅、文章、已读、收藏、关联、样本内容、时间兜底和不兼容配置；再运行重复导入与真实 feed 重抓去重验证。旧系统在演练期间照常运行；正式切换再安排稳定窗口/最终差量核对，未对齐期间不把新库当成唯一权威。此前阶段仅设计；后续已获授权并完成真实全量迁移，计数和差异见production.md。
 
 ## 本机开发与 NAS 部署
 
@@ -124,7 +124,7 @@ first_seen_at 优先源系统 created_at；确实缺失时用固定导入时间�
 
 本机已配置独立Colima/Lima Linux环境、Docker/Buildx CLI，实际AMD64镜像在本机Rosetta运行验证；不把构建转移到NAS。前端工具链用项目固定的 Node LTS/pnpm 与 lockfile；构建产物中只有发布用的二进制/静态资源，不带 node_modules、源码工具链和测试数据。
 
-端口分两个环境处理：**本机** API/Vite 首次配置通过本机 APR 分配并持久化，设置 agent.type=codex，不在每次启动调用 ensure；**NAS 没有 APR**，按用户明确的工作流，在部署时读取实际监听/容器映射和 NAS 台账，选定可用端口后固化到 Compose/nginx 并登记。本机 APR 不替 NAS 分配端口，也不为了这个项目向 NAS 安装 APR。本机APR已分配API41001/Vite41002，固化config/dev.env；NAS仍未分配端口。
+端口分两个环境处理：**本机** API/Vite 首次配置通过本机 APR 分配并持久化，设置 agent.type=codex，不在每次启动调用 ensure；**NAS 没有 APR**，按用户明确的工作流，在部署时读取实际监听/容器映射和 NAS 台账，选定可用端口后固化到 Compose/nginx 并登记。本机 APR 不替 NAS 分配端口，也不为了这个项目向 NAS 安装 APR。本机APR已分配API41001/Vite41002，固化config/dev.env；NAS已核对并使用回环18082，由现有read域名反代。
 
 ## 部署存储、备份与维护
 
@@ -151,3 +151,7 @@ NAS 容器映射到主机回环地址，由 nginx 提供 LAN/VPN HTTPS 入口。
 所有抓取/导入HTML在业务写事务前统一净化。同一写事务提交数据、FTS、changes、结果引用与幂等记录，token/session在事务中复验。来源没有GUID/URL或旧别名时，只靠标题不足以建立身份：有额外作者/时间材料才用明确fallback指纹，并返回provenance=fallback；冲突或缺失可在源健康识别。
 
 Miniflux旧hash通过版本适配的SHA256(GUID)查询既有迁入别名，链接变化仍保持ID和保护期；不为普通原生条目制造旧系统别名。特殊源设置差异默认阻止导入，不暗中扩大出站权限。
+
+## 内置 Agent 实现
+
+`internal/agent`提供独立模型工作循环，`internal/app/agent*`负责配置/预算/快照/租约/卡片/会话与检索，`internal/http/agent.go`实现共享OpenAPI。复用SQLite与原认证入口，不新增权限体系。固定未读集合含归档，缓存使用内容hash/深度/提示词版本，重要源完整分块、其他源有界截取，输出由系统生成内部文章引用。格式失败在文章范围内隔离，报告显示覆盖缺口；恢复与预算不足保留已经完成的成果。详见agent-design.md。

@@ -41,7 +41,7 @@ Key 留空保留已有值；可明确清除。数据库文件权限为 0600，�
 
 ## 结构化输出与引用
 
-实际提示词位于 `internal/agent/prompts/`，版本 `shiliu-agent/2`。固定 system 指令与任务指令独立于 JSON 编码的文章/标题/历史等资料。外部文字无修改配置或调用工具的能力。
+实际提示词位于 `internal/agent/prompts/`，版本 `shiliu-agent/3`。固定 system 指令与任务指令独立于 JSON 编码的文章/标题/历史等资料。外部文字无修改配置或调用工具的能力。
 
 文章输出使用 article-batch schema；报告/回答使用 narrative schema。服务端拒绝额外字段、尾随 JSON、未知/跨文章 ID、事实/分析无依据、HTML、URL 与 Markdown 链接。格式有一次修复机会；失败不以自由文本绕过。事实支持、指令注入抵抗和代表性仍需语义评估，结构验证不能证明事实都正确。
 

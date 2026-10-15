@@ -163,12 +163,12 @@ func (r *Runner) call(ctx context.Context, run app.AgentRun, v app.AgentSettings
 		if used == 0 {
 			used = tokens
 		}
-		if valid(completion.Text) != nil {
+		if validationErr := valid(completion.Text); validationErr != nil {
 			if e = r.App.FinishAgentCall(ctx, run, step, "invalid", "", used); e != nil {
 				return "", e
 			}
 			if attempt == 0 {
-				instructions += "\n上次输出不符合约束。仅返回上述 schema 的 JSON，检查每个引用 ID、文章顺序和必填字段。"
+				instructions += "\n上次输出不符合约束：" + validationErr.Error() + "。仅返回上述 schema 的 JSON，检查每个引用 ID、文章顺序和必填字段。"
 				continue
 			}
 			return "", ErrFormat
@@ -228,6 +228,37 @@ func (r *Runner) articleBatch(ctx context.Context, run app.AgentRun, v app.Agent
 	var out map[string][]app.AgentBlock
 	_, e := r.call(ctx, run, v, articlePrompt, input, articleSchema, func(raw string) error { var e error; out, e = parseBatch(raw, ev, ids); return e })
 	return out, e
+}
+
+// A malformed card must not prevent unrelated unread articles from being read.
+// Retry a failed batch individually to isolate the article that could not pass.
+func (r *Runner) isolatedBatch(ctx context.Context, run app.AgentRun, v app.AgentSettings, ev []Evidence) (map[string][]app.AgentBlock, map[string]bool, error) {
+	cards, err := r.articleBatch(ctx, run, v, ev)
+	failed := map[string]bool{}
+	if !errors.Is(err, ErrFormat) {
+		return cards, failed, err
+	}
+	cards = map[string][]app.AgentBlock{}
+	if len(ev) == 1 {
+		failed[ev[0].ArticleID] = true
+		return cards, failed, nil
+	}
+	for _, e := range ev {
+		one, bad, err := r.isolatedBatch(ctx, run, v, []Evidence{e})
+		if err != nil {
+			return nil, nil, err
+		}
+		cards[e.ArticleID] = one[e.ArticleID]
+		failed[e.ArticleID] = bad[e.ArticleID]
+	}
+	return cards, failed, nil
+}
+
+func failedCard(m app.AgentMember) app.AgentMember {
+	m.State, m.Depth, m.Error = "fallback", "title", "invalid_model_output"
+	m.BasisHash = hash(m.Title)
+	m.Card = []app.AgentBlock{{Kind: "limitation", Text: "模型输出未通过格式检查，本篇未纳入内容总结；可打开文章阅读。", EvidenceIDs: []string{}, Citations: []app.AgentCitation{{ArticleID: m.ArticleID, Title: m.Title, URL: "/?scope=all&article=" + m.ArticleID, BasisHash: m.BasisHash, Kind: "title"}}}}
+	return m
 }
 func (r *Runner) narrative(ctx context.Context, run app.AgentRun, v app.AgentSettings, task string, ev []Evidence, extra any) ([]app.AgentBlock, error) {
 	var out []app.AgentBlock
@@ -328,18 +359,31 @@ func (r *Runner) report(ctx context.Context, run app.AgentRun, v app.AgentSettin
 			chunkSize := max(256, min(5000, (v.ContextLimit-v.MaxOutput-8000)/4))
 			runes := []rune(c.Text)
 			parts := []app.AgentBlock{}
+			invalid := false
 			for start := 0; start < len(runes); start += chunkSize {
 				ch := ev
 				ch.ID = fmt.Sprintf("a%s-c%d", m.ArticleID, start/chunkSize)
 				ch.Text = string(runes[start:min(start+chunkSize, len(runes))])
 				cards, e := r.articleBatch(ctx, run, v, []Evidence{ch})
+				if errors.Is(e, ErrFormat) {
+					invalid = true
+					break
+				}
 				if e != nil {
 					return e
 				}
 				parts = append(parts, cards[m.ArticleID]...)
 			}
+			if invalid {
+				prepared = append(prepared, failedCard(m))
+				continue
+			}
 			// Hierarchical reduction keeps long documents bounded without omitting chunks.
 			reduced, e := r.reduce(ctx, run, v, parts, "归并同一篇文章的全部块，保留关键条件。", m.ArticleID, m.Title, m.BasisHash)
+			if errors.Is(e, ErrFormat) {
+				prepared = append(prepared, failedCard(m))
+				continue
+			}
 			if e != nil {
 				return e
 			}
@@ -362,11 +406,15 @@ func (r *Runner) report(ctx context.Context, run app.AgentRun, v app.AgentSettin
 			}
 			n--
 		}
-		cards, e := r.articleBatch(ctx, run, v, evs[:n])
+		cards, failed, e := r.isolatedBatch(ctx, run, v, evs[:n])
 		if e != nil {
 			return e
 		}
 		for _, m := range need[:n] {
+			if failed[m.ArticleID] {
+				prepared = append(prepared, failedCard(m))
+				continue
+			}
 			m.Card = cards[m.ArticleID]
 			m.State = "summarized"
 			if m.Error != "" {
