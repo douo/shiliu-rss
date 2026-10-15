@@ -1,0 +1,8 @@
+packages:
+  - .
+# The generator runs successfully with TS 6 and its output passes strict svelte-check.
+# Typography's declared OR range includes Tailwind 4; pnpm 11 flags it nonetheless.
+peerDependencyRules:
+  allowedVersions:
+    'openapi-typescript>typescript': '6.0.3'
+    '@tailwindcss/typography>tailwindcss': '4.3.3'

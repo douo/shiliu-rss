@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+cp api/generated.go "$tmp/go"
+cp web/src/lib/api.generated.ts "$tmp/ts"
+./scripts/generate
+diff -u "$tmp/go" api/generated.go
+diff -u "$tmp/ts" web/src/lib/api.generated.ts

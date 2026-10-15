@@ -12,3 +12,10 @@ web/.svelte-kit/
 web/build/
 playwright-report/
 test-results/
+web/.tools/
+.tools/
+dist/
+*.db
+*.db-wal
+*.db-shm
+*.db.lock

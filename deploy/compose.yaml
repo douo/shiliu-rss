@@ -1,0 +1,33 @@
+name: shiliu-rss
+services:
+  reader:
+    image: ${SHILIU_IMAGE:?Set the locally built and verified immutable release image}
+    platform: linux/amd64
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 512m
+    environment:
+      SHILIU_ADDR: ":8080"
+      SHILIU_DB: /data/reader.db
+      SHILIU_ORIGIN: ${SHILIU_ORIGIN:?Set the HTTPS public origin}
+      SHILIU_COOKIE_SECURE: "true"
+      SHILIU_BACKUP_DIR: /backup
+    env_file:
+      - ./reader.env
+    ports:
+      - "127.0.0.1:${NAS_PORT:?Check actual NAS listeners and record a free port first}:8080"
+    volumes:
+      - ./data:/data
+      - /srv/backups/shiliu-rss:/backup
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev,mode=1777
+    logging:
+      driver: json-file
+      options:
+        max-size: 5m
+        max-file: "3"
+    stop_grace_period: 45s

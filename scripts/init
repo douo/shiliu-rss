@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+set -a
+. ./config/dev.env
+set +a
+umask 077
+mkdir -p .local
+if [ ! -e .local/admin-password ]; then
+  openssl rand -base64 24 > .local/admin-password
+fi
+SHILIU_PASSWORD_FILE=.local/admin-password go run ./cmd/reader init
+printf '%s\n' 'Password file: .local/admin-password (local only; keep private).'
