@@ -95,12 +95,14 @@ test('audit: unsafe metadata links stay inert and favorite removal explains rete
   await auditedAPI(context);
   await page.goto('/?article=1');
   await expect(page.getByRole('heading', { name: '受保护的文章', exact: true })).toBeVisible();
-  await expect(page.getByRole('link', { name: '打开原文 (o)' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '打开原文 (Alt+Shift+O)' })).toHaveCount(0);
   await expect(page.getByText('<img src=x onerror=alert(1)>', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '取消收藏 (s)', exact: true }).click();
+  await page.getByRole('button', { name: '取消收藏 (Alt+Shift+S)', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('当前正文继续受源策略保护');
   await page.getByRole('button', { name: '保留收藏', exact: true }).last().click();
-  await expect(page.getByRole('button', { name: '取消收藏 (s)', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: '取消收藏 (Alt+Shift+S)', exact: true })
+  ).toBeVisible();
 });
 test('audit: back navigation revalidates session before restoring private content', async ({
   page,

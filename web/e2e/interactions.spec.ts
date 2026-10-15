@@ -66,7 +66,11 @@ const article = (id: string) => ({
     }
   ]
 });
-async function mock(page: Page, { expires = false, conflict = false, longMetadata = false } = {}) {
+async function mock(
+  page: Page,
+  { expires = false, conflict = false, longMetadata = false, manySources = false } = {}
+) {
+  await page.route('**/favicon.ico', (route) => route.abort());
   const source = longMetadata
     ? { ...feed, title: '合成超长订阅源名称'.repeat(8) + 'UnbrokenSource'.repeat(12) }
     : feed;
@@ -78,14 +82,29 @@ async function mock(page: Page, { expires = false, conflict = false, longMetadat
     items[0].title = '合成文章长标题'.repeat(12) + 'UnbrokenTitle'.repeat(12);
     items[0].author = 'SyntheticAuthor'.repeat(24);
   }
+  const sources = manySources
+    ? Array.from({ length: 200 }, (_, i) => ({
+        ...source,
+        id: String(i + 1),
+        title: `合成订阅 ${String(i + 1).padStart(3, '0')}`,
+        category_id: String((i % 20) + 1)
+      }))
+    : [source];
+  const groups = manySources
+    ? Array.from({ length: 20 }, (_, i) => ({
+        id: String(i + 1),
+        title: `合成分类 ${i + 1}`,
+        version: 1
+      }))
+    : [];
   await page.route('**/api/v1/**', async (route) => {
     const req = route.request(),
       url = new URL(req.url()),
       path = url.pathname;
     let result: unknown;
     if (path.endsWith('/session')) result = { authenticated: true, csrf_token: 'synthetic-csrf' };
-    else if (path.endsWith('/feeds')) result = [source];
-    else if (path.endsWith('/categories')) result = [];
+    else if (path.endsWith('/feeds')) result = sources;
+    else if (path.endsWith('/categories')) result = groups;
     else if (path.endsWith('/articles')) result = { items, next_cursor: '', high_watermark: '30' };
     else if (/\/articles\/\d+$/.test(path)) {
       const a = items.find((x) => x.id === path.split('/').at(-1))!;
@@ -124,9 +143,9 @@ test('reading preserves list position, keyboard state, and deep links', async ({
   await expect(page.getByRole('heading', { name: '合成文章 10', exact: true })).toBeVisible();
   await expect.poll(() => items[9].read_at).toBeTruthy();
   if (info.project.name === 'desktop') {
-    await page.keyboard.press('s');
+    await page.keyboard.press('Alt+Shift+KeyS');
     await expect.poll(() => items[9].favorite).toBe(true);
-    await page.keyboard.press('j');
+    await page.keyboard.press('Alt+Shift+ArrowDown');
     await expect(page.getByRole('heading', { name: '合成文章 11', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
   } else await page.getByRole('button', { name: '返回列表 (Esc)', exact: true }).click();
@@ -224,7 +243,7 @@ test('long source titles and reader metadata fit the viewport without hiding nav
   expect(count!.x + count!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
   if (info.project.name === 'mobile')
     await expect(page.getByRole('button', { name: '打开导航', exact: true })).toBeVisible();
-  await page.locator('.article-row').first().click();
+  await page.locator('.article-open').first().click();
   await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expect(await page.locator('.reader').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(
@@ -233,4 +252,192 @@ test('long source titles and reader metadata fit the viewport without hiding nav
   await page.getByRole('button', { name: '返回列表 (Esc)', exact: true }).click();
   await expect(page.locator('.article-row').first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('single keys stay available to browser extensions; explicit shortcuts use physical codes', async ({
+  page
+}) => {
+  const items = await mock(page);
+  await page.goto('/?article=1');
+  await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
+  for (const key of ['j', 'k', 'm', 's', 'o', '/', '?', 'Enter']) await page.keyboard.press(key);
+  await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
+  expect(items[0].favorite).toBe(false);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const handled = await page.evaluate(() => {
+    const results: Record<string, boolean> = {};
+    for (const [code, key, extra] of [
+      ['KeyS', 'ß', {}],
+      ['KeyR', 'r', { isComposing: true }],
+      ['KeyQ', 'q', {}],
+      ['KeyB', 'b', { repeat: true }]
+    ] as const) {
+      const event = new KeyboardEvent('keydown', {
+        code,
+        key,
+        altKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+        ...extra
+      });
+      document.body.dispatchEvent(event);
+      results[code] = event.defaultPrevented;
+    }
+    return results;
+  });
+  expect(handled).toEqual({ KeyS: true, KeyR: false, KeyQ: false, KeyB: true });
+  await expect.poll(() => items[0].favorite).toBe(true);
+  const note = page.getByRole('textbox', { name: '我的笔记', exact: true });
+  await note.focus();
+  await page.keyboard.press('Alt+Shift+KeyS');
+  await page.keyboard.press('Escape');
+  await expect(note).toBeFocused();
+  expect(items[0].favorite).toBe(true);
+  await page.getByRole('heading', { name: '合成文章 1', exact: true }).focus();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
+  await page.keyboard.press('Alt+Shift+KeyF');
+  await expect(page.getByRole('textbox', { name: '搜索文章', exact: true })).toBeFocused();
+});
+
+test('sidebar collapse expands reading space and persists; mobile navigation stays available', async ({
+  page
+}, info) => {
+  const items = await mock(page);
+  items[0].content[0].html =
+    '<h2>给阅读留出空间</h2>' +
+    '<p>这是用于界面验证的合成中文段落。订阅内容应当有清楚的层次、舒适的行宽和足够的留白。收起侧栏之后，正文获得更多空间；重新展开时，分类和来源仍然容易找到。</p>'.repeat(
+      6
+    );
+  await page.goto('/?article=1');
+  await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+  const before = await page.locator('.reader').boundingBox();
+  await page.keyboard.press('Alt+Shift+KeyB');
+  if (info.project.name === 'desktop') {
+    await expect(page.locator('.app-shell')).toHaveClass(/sidebar-collapsed/);
+    const after = await page.locator('.reader').boundingBox();
+    expect(after!.width - before!.width).toBeGreaterThan(200);
+    const content = await page.locator('.reading-content').boundingBox();
+    expect(content!.width).toBeGreaterThan(850);
+    expect(after!.height).toBeGreaterThan(800);
+    await page.screenshot({ path: 'test-results/redesign-desktop-reading.png' });
+    await page.reload();
+    await expect(page.locator('.app-shell')).toHaveClass(/sidebar-collapsed/);
+    await page.getByRole('button', { name: '切换侧栏 (Alt+Shift+B)', exact: true }).click();
+    await expect(page.getByRole('complementary', { name: '阅读侧栏' })).toBeVisible();
+  } else {
+    await expect(page.locator('.sidebar')).toHaveClass(/open/);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.sidebar')).not.toHaveClass(/open/);
+    await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+    await page.screenshot({ path: 'test-results/redesign-mobile-reading.png' });
+  }
+});
+
+test('one scroll region keeps sources discoverable with 200 feeds and 20 categories at short heights', async ({
+  page
+}, info) => {
+  await page.setViewportSize({ width: info.project.name === 'desktop' ? 1280 : 390, height: 480 });
+  await mock(page, { manySources: true });
+  await page.goto('/');
+  if (info.project.name === 'mobile')
+    await page.getByRole('button', { name: '打开导航', exact: true }).click();
+  await expect(page.getByRole('button', { name: '分类 20', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'false'
+  );
+  const visible = await page.locator('.source-nav button').evaluateAll(
+    (nodes) =>
+      nodes.filter((node) => {
+        const box = node.getBoundingClientRect(),
+          parent = node.closest('.sidebar-library')!.getBoundingClientRect();
+        return box.top >= parent.top && box.bottom <= parent.bottom;
+      }).length
+  );
+  expect(visible).toBeGreaterThanOrEqual(3);
+  await page.screenshot({ path: `test-results/redesign-${info.project.name}-short-sidebar.png` });
+  if (info.project.name === 'desktop') {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.screenshot({ path: 'test-results/redesign-desktop-sidebar.png' });
+    await page.setViewportSize({ width: 1280, height: 480 });
+  }
+  const footer = await page.locator('.sidebar-bottom').boundingBox();
+  expect(footer!.y + footer!.height).toBeLessThanOrEqual(480);
+  await page.getByLabel('筛选订阅', { exact: true }).fill('200');
+  await expect(
+    page.getByRole('navigation', { name: '订阅源', exact: true }).getByRole('button')
+  ).toHaveCount(1);
+  await page.getByRole('button', { name: '合成订阅 200', exact: true }).click();
+  await expect(page).toHaveURL(/scope=all&feed_id=200/);
+  await expect(page.getByRole('heading', { name: '合成订阅 200', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('source links are separate from reading buttons and favicon failures fall back safely', async ({
+  page
+}) => {
+  await mock(page);
+  // Playwright aborts all exact /favicon.ico requests before page.route handlers.
+  // Fulfill them through a separate CDP session to exercise the actual image path.
+  const session = await page.context().newCDPSession(page);
+  await session.send('Fetch.enable', {
+    patterns: [{ urlPattern: 'https://example.test/favicon.ico', requestStage: 'Request' }]
+  });
+  let iconRequests = 0,
+    failIcon = false;
+  session.on('Fetch.requestPaused', async (event) => {
+    iconRequests++;
+    expect(Object.keys(event.request.headers).some((key) => key.toLowerCase() === 'referer')).toBe(
+      false
+    );
+    await session.send('Fetch.fulfillRequest', {
+      requestId: event.requestId,
+      responseCode: failIcon ? 404 : 200,
+      responseHeaders: [{ name: 'Content-Type', value: 'image/svg+xml' }],
+      body: Buffer.from(
+        failIcon
+          ? ''
+          : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><rect width="16" height="16" fill="green"/></svg>'
+      ).toString('base64')
+    });
+  });
+  await page.goto('/');
+  const link = page
+    .locator('.article-row')
+    .first()
+    .getByRole('link', { name: feed.title, exact: true });
+  await expect(link).toHaveAttribute('href', '/?scope=all&feed_id=1');
+  await expect(link.locator('img')).toBeVisible();
+  await expect
+    .poll(() => link.locator('img').evaluate((img: HTMLImageElement) => img.naturalWidth))
+    .toBeGreaterThan(0);
+  expect(iconRequests).toBeGreaterThan(0);
+  expect(await link.evaluate((el) => el.closest('button') === null)).toBe(true);
+  const modified = await link.evaluate((el) => {
+    let prevented: boolean | undefined;
+    const observe = (e: MouseEvent) => {
+      prevented = e.defaultPrevented;
+      e.preventDefault();
+    };
+    document.addEventListener('click', observe, { once: true });
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }));
+    return prevented;
+  });
+  expect(modified).toBe(false);
+  await link.click();
+  await expect(page).toHaveURL('/?scope=all&feed_id=1');
+  await expect(page.getByRole('article', { name: '文章阅读' })).toHaveCount(0);
+  await page.locator('.article-open').first().click();
+  await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+  await expect(page.locator('.reading-content .feed-link')).toHaveAttribute(
+    'href',
+    '/?scope=all&feed_id=1'
+  );
+  failIcon = true;
+  await page.reload();
+  const icon = page.locator('.reading-content .feed-icon');
+  await expect(icon.locator('svg')).toBeVisible();
+  await expect(icon.locator('img')).toHaveCount(0);
 });

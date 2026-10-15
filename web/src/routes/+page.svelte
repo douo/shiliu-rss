@@ -10,16 +10,18 @@
     Settings2,
     Rss,
     ChevronRight,
-    Menu,
     X,
     ArrowDown,
     CheckCheck,
     LogOut,
     LoaderCircle,
     Keyboard,
-    RefreshCw
+    RefreshCw,
+    PanelLeftClose,
+    PanelLeftOpen
   } from '@lucide/svelte';
   import Reader from '../lib/Reader.svelte';
+  import FeedIcon from '../lib/FeedIcon.svelte';
   import { modal } from '../lib/modal';
   import { api, APIError } from '../lib/api';
   import type { Article, ArticlePatch, Feed, Category } from '../lib/models';
@@ -43,6 +45,18 @@
     searchDraft = $state(''),
     from = $state(''),
     until = $state('');
+  let isMobile = $state(false),
+    settingsTab = $state('feeds'),
+    sidebarCollapsed = $state(false),
+    sourceFilter = $state(''),
+    categoriesOpen = $state(false);
+  const visibleFeeds = $derived(
+    feeds.filter((feed) =>
+      `${feed.title} ${categories.find((c) => c.id === feed.category_id)?.title || ''}`
+        .toLocaleLowerCase()
+        .includes(sourceFilter.trim().toLocaleLowerCase())
+    )
+  );
   let navOpen = $state(false),
     settingsOpen = $state(false),
     SettingsComponent = $state<typeof import('../lib/Settings.svelte').default | null>(null),
@@ -282,7 +296,8 @@
       busy = false;
     }
   }
-  async function showSettings() {
+  async function showSettings(initialTab = 'feeds') {
+    settingsTab = initialTab;
     settingsOpen = true;
     navOpen = false;
     selected = null;
@@ -304,57 +319,88 @@
       handleError(e);
     }
   }
-  function keyboard(e: KeyboardEvent) {
-    if (!authenticated || e.ctrlKey || e.metaKey || e.altKey) return;
-    const target = e.target as HTMLElement;
-    if (target.matches('input,textarea,select,[contenteditable]')) {
-      if (e.key === 'Escape') target.blur();
-      return;
+  function toggleSidebar() {
+    if (isMobile) navOpen = !navOpen;
+    else {
+      sidebarCollapsed = !sidebarCollapsed;
+      if (sidebarCollapsed && document.activeElement?.closest('.sidebar'))
+        void tick().then(() =>
+          document.querySelector<HTMLButtonElement>('.sidebar-toggle')?.focus()
+        );
+      try {
+        localStorage.setItem('shiliu:sidebar-collapsed', String(sidebarCollapsed));
+      } catch {
+        /* Preference storage may be disabled. */
+      }
     }
-    if (e.key === 'Escape') {
+  }
+  function sourceHref(id: string) {
+    return `/?${new URLSearchParams({ scope: 'all', feed_id: id })}`;
+  }
+  function sourceClick(e: MouseEvent, id: string) {
+    if (e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    void navigate('all', { feed: id });
+  }
+  function keyboard(e: KeyboardEvent) {
+    if (!authenticated || e.defaultPrevented || e.isComposing) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])'))
+      return;
+    if (e.code === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       if (unfavoriteTarget) unfavoriteTarget = null;
       else if (shortcutOpen) shortcutOpen = false;
-      else if (selected) closeReader();
+      else if (navOpen) navOpen = false;
+      else if (selected) void closeReader();
       else if (settingsOpen) {
         settingsOpen = false;
         syncURL();
-      } else navOpen = false;
+      } else return;
+      e.preventDefault();
       return;
     }
-    if (settingsOpen || shortcutOpen || unfavoriteTarget) return;
-    if (e.key === '/') {
-      e.preventDefault();
-      searchElement?.focus();
-    }
-    if (e.key === '?') shortcutOpen = !shortcutOpen;
-    if (['j', 'k'].includes(e.key)) {
-      e.preventDefault();
-      if (selected) move(e.key === 'j' ? 1 : -1);
+    if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || shortcutOpen || unfavoriteTarget)
+      return;
+    if (e.code === 'KeyB') {
+      if (!e.repeat) toggleSidebar();
+    } else if (settingsOpen) return;
+    else if (e.code === 'KeyF') {
+      void (async () => {
+        if (selected) await closeReader();
+        await tick();
+        searchElement?.focus();
+      })();
+    } else if (['ArrowDown', 'ArrowUp'].includes(e.code) && articles.length) {
+      const n = e.code === 'ArrowDown' ? 1 : -1;
+      if (selected) void move(n);
       else {
-        activeIndex = Math.min(
-          articles.length - 1,
-          Math.max(0, activeIndex + (e.key === 'j' ? 1 : -1))
-        );
+        activeIndex = Math.min(articles.length - 1, Math.max(0, activeIndex + n));
         document
           .querySelector<HTMLButtonElement>(`[data-article-id="${articles[activeIndex]?.id}"]`)
           ?.focus();
       }
-    }
-    if (
-      e.key === 'Enter' &&
-      !selected &&
-      articles[activeIndex] &&
-      (target === document.body || target.matches('[data-article-id]'))
-    ) {
-      e.preventDefault();
-      void open(articles[activeIndex].id);
-    }
-    if (selected && e.key === 'm') void patch({ read: !selected.read_at }).catch(() => {});
-    if (selected && e.key === 's') void patch({ favorite: !selected.favorite }).catch(() => {});
-    if (selected && e.key === 'o' && externalURL(selected.url))
-      window.open(externalURL(selected.url), '_blank', 'noopener,noreferrer');
+    } else if (selected && e.code === 'KeyR') {
+      if (!e.repeat) void patch({ read: !selected.read_at }).catch(() => {});
+    } else if (selected && e.code === 'KeyS') {
+      if (!e.repeat) void patch({ favorite: !selected.favorite }).catch(() => {});
+    } else if (selected && e.code === 'KeyO' && externalURL(selected.url)) {
+      if (!e.repeat) window.open(externalURL(selected.url), '_blank', 'noopener,noreferrer');
+    } else return;
+    e.preventDefault();
   }
   onMount(() => {
+    try {
+      sidebarCollapsed = localStorage.getItem('shiliu:sidebar-collapsed') === 'true';
+    } catch {
+      /* Optional preference. */
+    }
+    const media = window.matchMedia('(max-width: 640px)');
+    const resize = () => {
+      isMobile = media.matches;
+      if (!isMobile) navOpen = false;
+    };
+    resize();
+    media.addEventListener('change', resize);
     let disposed = false;
     const pop = async () => {
       const id = readURL();
@@ -392,6 +438,7 @@
     window.addEventListener('popstate', pop);
     return () => {
       disposed = true;
+      media.removeEventListener('change', resize);
       window.removeEventListener('popstate', pop);
       window.removeEventListener('shiliu:session-expired', expired);
       sessionChannel?.close();
@@ -485,8 +532,7 @@
     <form class="login-card" onsubmit={login}>
       <img src="/icon.svg" alt="拾流石榴图标" />
       <p class="eyebrow">SHILIU · RSS</p>
-      <h1>拾起信息，留住思考。</h1>
-      <p class="login-intro">属于你的安静阅读空间。</p>
+      <h1>登录拾流 RSS</h1>
       <label for="password">登录密码</label><input
         id="password"
         type="password"
@@ -502,9 +548,12 @@
         /></button
       >
     </form>
-    <span class="login-footer">拾流 RSS · 为阅读留一处空白</span>
   </main>
-{:else}<div class="app-shell" class:has-reader={!!selected}>
+{:else}<div
+    class="app-shell"
+    class:has-reader={!!selected}
+    class:sidebar-collapsed={sidebarCollapsed}
+  >
     {#if navOpen}<button
         class="nav-shade"
         aria-label="关闭导航"
@@ -512,7 +561,13 @@
           navOpen = false;
         }}
       ></button>{/if}
-    <aside class:open={navOpen} class="sidebar">
+    <aside
+      class:open={navOpen}
+      class="sidebar"
+      id="reading-sidebar"
+      aria-label="阅读侧栏"
+      inert={isMobile ? !navOpen : sidebarCollapsed}
+    >
       <a
         href="/"
         class="brand"
@@ -521,54 +576,91 @@
           navigate('recent');
         }}><img src="/icon.svg" alt="" /><span>拾流 <small>RSS</small></span></a
       >
-      <div class="workspace-caption">我的阅读空间</div>
       <nav aria-label="阅读导航" class="main-nav">
         <button
           class:chosen={scope === 'recent' && !favorite && !feedID && !categoryID}
-          onclick={() => navigate('recent')}
-          ><Inbox size={18} />近期文章<span class="nav-hint">01</span></button
+          onclick={() => navigate('recent')}><Inbox size={18} />近期文章</button
         ><button class:chosen={favorite} onclick={() => navigate('all', { favorite: true })}
           ><Star size={18} />我的收藏</button
         ><button class:chosen={scope === 'archive' && !favorite} onclick={() => navigate('archive')}
           ><Archive size={18} />归档</button
         >
       </nav>
-      <div class="nav-section-label">分类</div>
-      <nav aria-label="分类">
-        {#each categories as category}<button
-            class:chosen={categoryID === category.id}
-            onclick={() => navigate('recent', { category: category.id })}
-            ><span class="category-dot"></span>{category.title}</button
-          >{/each}{#if !categories.length}<p class="nav-empty">在设置中整理订阅分类</p>{/if}
-      </nav>
-      <div class="nav-section-label">
-        订阅源 <button class="icon-button" onclick={showSettings} aria-label="管理订阅"
-          ><Settings2 size={13} /></button
+      <div class="sidebar-library">
+        <label class="source-filter"
+          ><Search size={14} /><input
+            aria-label="筛选订阅"
+            placeholder="筛选订阅"
+            bind:value={sourceFilter}
+          /></label
         >
+        <div class="category-section">
+          <div class="category-heading">
+            <button
+              class="section-toggle"
+              aria-expanded={categoriesOpen}
+              onclick={() => {
+                categoriesOpen = !categoriesOpen;
+              }}
+              ><ChevronRight size={13} class={categoriesOpen ? 'expanded' : ''} />分类<span
+                >{categories.length}</span
+              ></button
+            ><button
+              class="icon-button"
+              aria-label="管理分类"
+              onclick={() => showSettings('categories')}><Settings2 size={14} /></button
+            >
+          </div>
+          {#if categoriesOpen}<nav aria-label="分类">
+              {#each categories as category}<button
+                  class:chosen={categoryID === category.id}
+                  onclick={() => navigate('all', { category: category.id })}
+                  ><span class="category-dot"></span><span>{category.title}</span></button
+                >{/each}
+            </nav>{/if}
+        </div>
+        <div class="nav-section-label">
+          订阅源 <span>{visibleFeeds.length}</span><button
+            class="icon-button"
+            onclick={() => showSettings()}
+            aria-label="管理订阅"><Settings2 size={14} /></button
+          >
+        </div>
+        <nav aria-label="订阅源" class="source-nav">
+          {#each visibleFeeds as feed}<button
+              class:chosen={feedID === feed.id}
+              onclick={() => navigate('all', { feed: feed.id })}
+              title={feed.title}
+              ><FeedIcon {feed} /><span>{feed.title || '未命名订阅'}</span>{#if feed.error}<span
+                  class="health-dot"
+                  title="最近抓取失败"
+                ></span>{/if}</button
+            >{/each}
+          {#if !feeds.length}<button onclick={() => showSettings()}
+              ><Rss size={15} />添加第一个订阅</button
+            >{:else if !visibleFeeds.length}<p class="nav-empty">没有匹配的订阅</p>{/if}
+        </nav>
       </div>
-      <nav aria-label="订阅源" class="source-nav">
-        {#each feeds as feed}<button
-            class:chosen={feedID === feed.id}
-            onclick={() => navigate('recent', { feed: feed.id })}
-            ><Rss size={14} /><span>{feed.title || new URL(feed.url).hostname}</span
-            >{#if feed.error}<span class="health-dot" title="最近抓取失败"></span>{/if}</button
-          >{/each}{#if !feeds.length}<button onclick={showSettings}
-            ><Rss size={15} />添加第一个订阅</button
-          >{/if}
-      </nav>
       <div class="sidebar-bottom">
-        <button onclick={showSettings}><Settings2 size={17} />设置与授权</button><button
+        <button onclick={() => showSettings()} title="设置与授权" aria-label="设置与授权"
+          ><Settings2 size={17} /></button
+        >
+        <button
           onclick={() => {
             shortcutOpen = true;
-          }}><Keyboard size={17} />快捷键<span class="keycap">?</span></button
-        ><button onclick={logout}><LogOut size={16} />退出登录</button>
-        <p>少一些噪音，多一点阅读。</p>
+          }}
+          title="快捷键"
+          aria-label="快捷键"><Keyboard size={17} /></button
+        >
+        <button onclick={logout} title="退出登录" aria-label="退出登录"><LogOut size={17} /></button
+        >
       </div>
     </aside>
     <main class="main-pane">
       {#if settingsOpen && SettingsComponent}<SettingsComponent
           {feeds}
           {categories}
+          initialTab={settingsTab}
           onupdate={sources}
           onclose={() => {
             settingsOpen = false;
@@ -577,18 +669,34 @@
         />
       {:else if selected}{#if error}<p class="error global-error" role="alert">
             {error}
-          </p>{/if}<Reader article={selected} onclose={closeReader} onpatch={patch} onmove={move} />
+          </p>{/if}<Reader
+          article={selected}
+          feed={feeds.find((f) => f.id === selected!.feed_id)}
+          onclose={closeReader}
+          onpatch={patch}
+          onmove={move}
+          ontogglesidebar={toggleSidebar}
+          {sidebarCollapsed}
+          {navOpen}
+          {isMobile}
+          onsource={sourceClick}
+          sourceHref={sourceHref(selected.feed_id)}
+        />
       {:else}<header class="page-header">
           <div class="page-heading">
             <button
-              class="icon-button mobile-menu"
-              onclick={() => {
-                navOpen = true;
-              }}
-              aria-label="打开导航"><Menu size={21} /></button
+              class="icon-button sidebar-toggle"
+              onclick={toggleSidebar}
+              aria-label={isMobile ? (navOpen ? '关闭导航' : '打开导航') : '切换侧栏 (Alt+Shift+B)'}
+              title="切换侧栏 (Alt+Shift+B)"
+              aria-controls="reading-sidebar"
+              aria-expanded={isMobile ? navOpen : !sidebarCollapsed}
             >
+              {#if isMobile ? !navOpen : sidebarCollapsed}<PanelLeftOpen
+                  size={20}
+                />{:else}<PanelLeftClose size={20} />{/if}
+            </button>
             <div>
-              <p class="eyebrow">YOUR DAILY READING</p>
               <h1>{title}</h1>
             </div>
             <span class="article-count">{articles.length}{cursor ? '+' : ''} 篇</span>
@@ -600,7 +708,7 @@
               bind:value={searchDraft}
               placeholder="搜索文章、笔记与摘要"
               maxlength="128"
-            /><kbd>/</kbd>
+            /><kbd title="Alt+Shift+F">Alt⇧F</kbd>
           </form>
         </header>
         <div class="list-controls">
@@ -670,32 +778,45 @@
           </div>{/if}
         {#if error}<p class="error global-error" role="alert">{error}</p>{/if}
         <div class="article-list" bind:this={listElement} aria-busy={loading}>
-          {#each articles as article, i}<button
+          {#each articles as article, i}<div
               class="article-row"
-              data-article-id={article.id}
               class:is-read={!!article.read_at}
               class:keyboard-active={i === activeIndex}
-              onclick={() => open(article.id)}
-              ><span class="unread-dot" class:invisible={!!article.read_at}></span>
-              <div class="article-summary">
-                <div class="article-source">
-                  {article.feed_title}<span>·</span><time
-                    datetime={article.published_at || article.first_seen_at}
-                    >{date(article.published_at || article.first_seen_at)}</time
-                  >{#if article.body_state === 'purged'}<span class="body-badge">正文已清理</span
-                    >{/if}
-                </div>
-                <h2>{article.title}</h2>
-                {#if article.tags?.length}<div class="article-tags">
-                    {#each article.tags as tag}<span>#{tag}</span>{/each}
-                  </div>{/if}
+            >
+              <div class="article-source">
+                <a
+                  class="feed-link"
+                  href={sourceHref(article.feed_id)}
+                  onclick={(e) => sourceClick(e, article.feed_id)}
+                  title={article.feed_title}
+                  ><FeedIcon feed={feeds.find((f) => f.id === article.feed_id)} /><span
+                    >{article.feed_title}</span
+                  ></a
+                >
+                <time datetime={article.published_at || article.first_seen_at}
+                  >{date(article.published_at || article.first_seen_at)}</time
+                >
+                {#if article.body_state === 'purged'}<span class="body-badge">正文已清理</span>{/if}
               </div>
-              {#if article.favorite}<Star
-                  size={15}
-                  class="list-star"
-                  fill="currentColor"
-                />{/if}<ChevronRight size={17} class="row-chevron" /></button
-            >{/each}
+              <button
+                class="article-open"
+                data-article-id={article.id}
+                onclick={() => open(article.id)}
+              >
+                <span class="unread-dot" class:invisible={!!article.read_at}></span>
+                <div class="article-summary">
+                  <h2>{article.title}</h2>
+                  {#if article.tags?.length}<div class="article-tags">
+                      {#each article.tags as tag}<span>#{tag}</span>{/each}
+                    </div>{/if}
+                </div>
+                {#if article.favorite}<Star
+                    size={15}
+                    class="list-star"
+                    fill="currentColor"
+                  />{/if}<ChevronRight size={17} class="row-chevron" />
+              </button>
+            </div>{/each}
           {#if !articles.length && !loading}<div class="empty-state">
               <div class="empty-icon">
                 {#if favorite}<Star size={29} />{:else if query}<Search size={29} />{:else}<Inbox
@@ -718,7 +839,7 @@
                     ? '后台会持续检查订阅。你也可以在设置中查看源健康与下次尝试。'
                     : '添加喜欢的 RSS / Atom / JSON Feed，新的内容会安静地汇聚在这里。'}
               </p>
-              {#if !feeds.length}<button class="button" onclick={showSettings}
+              {#if !feeds.length}<button class="button" onclick={() => showSettings()}
                   ><Rss size={16} />添加订阅</button
                 >{/if}
             </div>{/if}
@@ -732,18 +853,7 @@
             >{/if}{#if loading && !articles.length}<div class="list-loading">
               <LoaderCircle class="spin" size={20} /><span>正在加载文章…</span>
             </div>{/if}
-          {#if articles.length}<div class="list-end">
-              <span></span>留一点时间，好好阅读<span></span>
-            </div>{/if}
-        </div>
-        <footer class="list-footer">
-          <span>后台自动更新 · 全文按需获取</span><button
-            class="text-button"
-            onclick={() => {
-              shortcutOpen = true;
-            }}>j / k 导航 <Keyboard size={14} /></button
-          >
-        </footer>{/if}
+        </div>{/if}
     </main>
   </div>{/if}
 {#if shortcutOpen}<div class="modal-shade">
@@ -767,7 +877,7 @@
           aria-label="关闭快捷键"><X size={19} /></button
         >
       </div>
-      {#each [['j / k', '下一篇 / 上一篇'], ['Enter', '打开选中文章'], ['m', '切换已读'], ['s', '切换收藏'], ['o', '打开原文'], ['/', '搜索'], ['Esc', '返回列表 / 关闭面板'], ['?', '显示快捷键']] as [key, label]}<div
+      {#each [['Alt+Shift+B', '展开 / 收起侧栏'], ['Alt+Shift+↓ / ↑', '下一篇 / 上一篇或移动列表焦点'], ['Tab / Enter', '聚焦 / 启用按钮或链接'], ['Alt+Shift+R', '切换已读'], ['Alt+Shift+S', '切换收藏'], ['Alt+Shift+O', '打开原文'], ['Alt+Shift+F', '搜索文章'], ['Esc', '返回列表 / 关闭当前面板']] as [key, label]}<div
         >
           <kbd>{key}</kbd><span>{label}</span>
         </div>{/each}

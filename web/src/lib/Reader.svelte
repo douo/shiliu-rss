@@ -8,18 +8,35 @@
     ExternalLink,
     FileText,
     Bookmark,
-    LoaderCircle
+    LoaderCircle,
+    PanelLeftClose,
+    PanelLeftOpen
   } from '@lucide/svelte';
-  import type { Article, ArticlePatch, Job } from './models';
+  import FeedIcon from './FeedIcon.svelte';
+  import type { Article, ArticlePatch, Job, Feed } from './models';
   import { api } from './api';
   import { externalURL } from './links';
   let {
     article,
     onclose,
     onpatch,
-    onmove
+    onmove,
+    feed,
+    ontogglesidebar,
+    sidebarCollapsed,
+    navOpen,
+    isMobile,
+    onsource,
+    sourceHref
   }: {
     article: Article;
+    feed?: Feed;
+    ontogglesidebar: () => void;
+    sidebarCollapsed: boolean;
+    navOpen: boolean;
+    isMobile: boolean;
+    onsource: (e: MouseEvent, id: string) => void;
+    sourceHref: string;
     onclose: () => void;
     onpatch: (p: ArticlePatch) => Promise<void>;
     onmove: (n: number) => void;
@@ -89,14 +106,29 @@
 
 <article class="reader" aria-label="文章阅读">
   <div class="reader-toolbar">
-    <button onclick={onclose} class="icon-button" aria-label="返回列表 (Esc)"
+    <button
+      onclick={ontogglesidebar}
+      class="icon-button sidebar-toggle"
+      aria-label="切换侧栏 (Alt+Shift+B)"
+      title="切换侧栏 (Alt+Shift+B)"
+      aria-controls="reading-sidebar"
+      aria-expanded={isMobile ? navOpen : !sidebarCollapsed}
+      >{#if isMobile ? !navOpen : sidebarCollapsed}<PanelLeftOpen size={19} />{:else}<PanelLeftClose
+          size={19}
+        />{/if}</button
+    >
+    <button onclick={onclose} class="icon-button" aria-label="返回列表 (Esc)" title="返回列表 (Esc)"
       ><ArrowLeft size={19} /></button
     ><span class="toolbar-spacer"></span><button
       onclick={() => onmove(-1)}
       class="icon-button"
-      aria-label="上一篇 (k)"><ArrowUp size={18} /></button
-    ><button onclick={() => onmove(1)} class="icon-button" aria-label="下一篇 (j)"
-      ><ArrowDown size={18} /></button
+      aria-label="上一篇 (Alt+Shift+↑)"
+      title="上一篇 (Alt+Shift+↑)"><ArrowUp size={18} /></button
+    ><button
+      onclick={() => onmove(1)}
+      class="icon-button"
+      aria-label="下一篇 (Alt+Shift+↓)"
+      title="下一篇 (Alt+Shift+↓)"><ArrowDown size={18} /></button
     ><span class="divider"></span><button
       class:active={article.read_at}
       onclick={() =>
@@ -104,7 +136,9 @@
           error = e.message;
         })}
       class="icon-button"
-      aria-label={article.read_at ? '标为未读 (m)' : '标为已读 (m)'}><Check size={18} /></button
+      aria-label={article.read_at ? '标为未读 (Alt+Shift+R)' : '标为已读 (Alt+Shift+R)'}
+      title={article.read_at ? '标为未读 (Alt+Shift+R)' : '标为已读 (Alt+Shift+R)'}
+      ><Check size={18} /></button
     ><button
       class:active={article.favorite}
       onclick={() =>
@@ -112,21 +146,26 @@
           error = e.message;
         })}
       class="icon-button"
-      aria-label={article.favorite ? '取消收藏 (s)' : '收藏文章 (s)'}
+      aria-label={article.favorite ? '取消收藏 (Alt+Shift+S)' : '收藏文章 (Alt+Shift+S)'}
+      title={article.favorite ? '取消收藏 (Alt+Shift+S)' : '收藏文章 (Alt+Shift+S)'}
       ><Star size={18} fill={article.favorite ? 'currentColor' : 'none'} /></button
     ><a
       href={externalURL(article.url)}
       target="_blank"
       rel="noopener noreferrer"
       class="icon-button"
-      aria-label="打开原文 (o)"><ExternalLink size={18} /></a
+      aria-label="打开原文 (Alt+Shift+O)"
+      title="打开原文 (Alt+Shift+O)"><ExternalLink size={18} /></a
     >
   </div>
   <div class="reading-content">
     <div class="eyebrow">
-      {article.feed_title}<span>·</span>{new Date(
-        article.published_at || article.first_seen_at
-      ).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })}
+      <a class="feed-link" href={sourceHref} onclick={(e) => onsource(e, article.feed_id)}
+        ><FeedIcon {feed} /><span>{article.feed_title}</span></a
+      ><span>·</span>{new Date(article.published_at || article.first_seen_at).toLocaleDateString(
+        'zh-CN',
+        { year: 'numeric', month: 'long', day: 'numeric' }
+      )}
     </div>
     <h1 tabindex="-1">{article.title}</h1>
     {#if article.author}<p class="article-author">{article.author}</p>{/if}
