@@ -6,8 +6,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -320,5 +322,52 @@ func TestSchemaProbeRejectsMissingRequiredColumns(t *testing.T) {
 	delete(cols["entries"], "hash")
 	if _, e = validateSchema(cols); e == nil || !strings.Contains(e.Error(), "entries.hash") {
 		t.Fatal("missing required hash accepted")
+	}
+}
+
+// Imported feed taxonomies must survive even when they exceed hand-edited tags.
+func TestImportPreservesLargeLegacyTaxonomy(t *testing.T) {
+	ctx := context.Background()
+	now := time.Date(2026, 10, 16, 0, 0, 0, 0, time.UTC)
+	svc, _ := newService(t, &now)
+	tags := make([]string, 1820)
+	for i := range tags {
+		tags[i] = fmt.Sprintf("source-tag-%04d", i)
+	}
+	tags[0] = strings.Repeat("界", 100)
+	data := syntheticSnapshot(t, false)
+	raw, _ := json.Marshal(tags)
+	data = bytes.Replace(data, []byte(`"tags":["音乐"]`), append([]byte(`"tags":`), raw...), 1)
+	if _, err := Import(ctx, bytes.NewReader(data), svc, ImportOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	page, err := svc.ListArticles(ctx, app.ArticleQuery{Scope: "all", Limit: 50})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found bool
+	for _, article := range page.Items {
+		if article.Title != "古典音乐甲" {
+			continue
+		}
+		full, err := svc.GetArticle(ctx, article.ID)
+		if err != nil || !reflect.DeepEqual(full.Tags, tags) {
+			t.Fatal("legacy taxonomy changed", err)
+		}
+		note := "retained tags"
+		updated, err := svc.UpdateArticle(ctx, article.ID, article.Version, app.ArticlePatch{Note: &note})
+		if err != nil || !reflect.DeepEqual(updated.Tags, tags) {
+			t.Fatal("note update lost tags", err)
+		}
+		if _, err = svc.UpdateArticle(ctx, article.ID, updated.Version, app.ArticlePatch{Tags: &tags}); err == nil {
+			t.Fatal("ordinary edit limit bypassed")
+		}
+		found = true
+	}
+	if !found {
+		t.Fatal("imported article missing")
+	}
+	if _, err := Import(ctx, bytes.NewReader(data), svc, ImportOptions{}); err != nil {
+		t.Fatal("retry failed", err)
 	}
 }

@@ -101,14 +101,27 @@ func affected(r sql.Result, e error) error {
 }
 func jsonTags(v []string) string { b, _ := json.Marshal(v); return string(b) }
 func validateTags(tags []string) ([]string, error) {
-	if len(tags) > 50 {
+	return validateTagLimits(tags, 50, 64)
+}
+
+// Legacy feeds can carry large taxonomies. Preserve them during import while
+// keeping ordinary editing limits and bounding memory used by external input.
+func validateImportedTags(tags []string) ([]string, error) {
+	if len(jsonTags(tags)) > 256*1024 {
+		return nil, ErrInvalid
+	}
+	return validateTagLimits(tags, 4096, 1024)
+}
+
+func validateTagLimits(tags []string, countLimit, charLimit int) ([]string, error) {
+	if len(tags) > countLimit {
 		return nil, ErrInvalid
 	}
 	out := []string{}
 	seen := map[string]bool{}
 	for _, t := range tags {
 		t = strings.TrimSpace(t)
-		if t == "" || len([]rune(t)) > 64 {
+		if t == "" || len([]rune(t)) > charLimit {
 			return nil, ErrInvalid
 		}
 		if !seen[t] {

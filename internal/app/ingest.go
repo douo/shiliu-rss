@@ -101,7 +101,7 @@ func (s *Service) upsertEntry(ctx context.Context, tx *sql.Tx, feedID string, e 
 					unknown = true
 				}
 			}
-			t, e := validateTags(imp.Tags)
+			t, e := validateImportedTags(imp.Tags)
 			if e != nil {
 				return "", e
 			}

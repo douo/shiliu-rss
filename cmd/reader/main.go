@@ -13,6 +13,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/gofrs/flock"
 	"shiliu-rss/internal/agent"

@@ -74,10 +74,13 @@
     try {
       await onpatch({
         note,
-        tags: tags
-          .split(/[,，]/)
-          .map((t) => t.trim())
-          .filter(Boolean)
+        tags:
+          tags === (article.tags || []).join(', ')
+            ? undefined
+            : tags
+                .split(/[,，]/)
+                .map((t) => t.trim())
+                .filter(Boolean)
       });
     } catch (e) {
       error = (e as Error).message;

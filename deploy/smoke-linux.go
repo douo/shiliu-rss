@@ -133,6 +133,20 @@ func run() error {
 		return e
 	}
 	csrf = session.CSRF
+	data, e = request("GET", "/api/v1/agent/settings", nil, 200)
+	if e != nil {
+		return e
+	}
+	var settings map[string]any
+	if e = json.Unmarshal(data, &settings); e != nil {
+		return e
+	}
+	if settings["timezone"] != "Asia/Shanghai" || settings["daily_time"] != "08:00" {
+		return fmt.Errorf("Agent schedule defaults differ")
+	}
+	if _, e = request("PUT", "/api/v1/agent/settings", map[string]any{"settings": settings}, 200); e != nil {
+		return e
+	}
 	if _, e = request("GET", "/api/v1/synthetic-missing", nil, 404); e != nil {
 		return e
 	}
