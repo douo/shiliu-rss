@@ -140,6 +140,15 @@ func (r *Runner) Execute(ctx context.Context, j app.Job) {
 		target = a.URL
 	}
 	host := fetch.HostKey(target)
+	until, err := r.App.HostCooldown(ctx, host)
+	if err != nil {
+		_ = r.App.DeferJob(ctx, j.ID, j.LeaseOwner, r.App.Now().Add(time.Minute))
+		return
+	}
+	if r.App.Now().Before(until) {
+		_ = r.App.DeferJob(ctx, j.ID, j.LeaseOwner, until)
+		return
+	}
 	r.mu.Lock()
 	lock := r.hosts[host]
 	if lock == nil {
@@ -172,6 +181,12 @@ func (r *Runner) Execute(ctx context.Context, j app.Job) {
 	}
 	if e != nil && ctx.Err() == nil {
 		code := "processing_failed"
+		if errors.Is(e, app.ErrConflict) {
+			code = "identity_conflict"
+		}
+		if errors.Is(e, app.ErrInvalid) {
+			code = "invalid_entry"
+		}
 		var retry *time.Time
 		var fe *fetch.Error
 		if errors.As(e, &fe) {
@@ -180,6 +195,9 @@ func (r *Runner) Execute(ctx context.Context, j app.Job) {
 		}
 		if errors.Is(e, app.ErrLease) {
 			return
+		}
+		if retry != nil {
+			ctx = app.WithHostCooldown(ctx, host, *retry)
 		}
 		if err := r.App.FailJob(ctx, j.ID, j.LeaseOwner, code, retry); err != nil {
 			slog.Error("job_commit_failed", "job_id", j.ID)

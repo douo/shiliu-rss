@@ -148,7 +148,7 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 		if *q.Read {
 			where = append(where, "a.read_at IS NOT NULL")
 		} else {
-			where = append(where, "a.read_at IS NULL")
+			where = append(where, "a.read_at IS NULL AND a.removed=0")
 		}
 	}
 	if q.Favorite != nil {
@@ -186,9 +186,30 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 		if e != nil {
 			return out, e
 		}
+		// A bounded probe avoids materializing every positional match for a
+		// broad query when the page only needs 50 rows. Sparse terms still use
+		// an FTS candidate set so they do not scan all article metadata.
+		fullMatch, _ := searchQuery(q.Query)
+		probe, err := s.Store.Read.QueryContext(ctx, `SELECT rowid FROM search WHERE search MATCH ? LIMIT 201`, fullMatch)
+		if err != nil {
+			return out, err
+		}
+		count := 0
+		for probe.Next() {
+			count++
+		}
+		err = probe.Err()
+		probe.Close()
+		if err != nil {
+			return out, err
+		}
+		membership := `a.id IN (SELECT rowid FROM search WHERE search MATCH ?)`
+		if count > 200 {
+			membership = `EXISTS(SELECT 1 FROM search WHERE rowid=a.id AND search MATCH ?)`
+		}
 		for _, term := range strings.Fields(q.Query) {
 			match, _ := searchQuery(term)
-			where = append(where, `(a.id IN (SELECT rowid FROM search WHERE search MATCH ?) OR (EXISTS(SELECT 1 FROM article_content c WHERE c.article_id=a.id AND c.kind='feed' AND c.state='available' AND (a.favorite=1 OR f.archive=1 OR max(c.expires_at,COALESCE(a.protection_until,''))>?)) AND a.id IN (SELECT rowid FROM search WHERE search MATCH ?)) OR (EXISTS(SELECT 1 FROM article_content c WHERE c.article_id=a.id AND c.kind='fulltext' AND c.state='available' AND (a.favorite=1 OR f.archive=1 OR max(c.expires_at,COALESCE(a.protection_until,''))>?)) AND a.id IN (SELECT rowid FROM search WHERE search MATCH ?)))`)
+			where = append(where, `(`+membership+` OR (EXISTS(SELECT 1 FROM article_content c WHERE c.article_id=a.id AND c.kind='feed' AND c.state='available' AND (a.favorite=1 OR f.archive=1 OR max(c.expires_at,COALESCE(a.protection_until,''))>?)) AND `+membership+`) OR (EXISTS(SELECT 1 FROM article_content c WHERE c.article_id=a.id AND c.kind='fulltext' AND c.state='available' AND (a.favorite=1 OR f.archive=1 OR max(c.expires_at,COALESCE(a.protection_until,''))>?)) AND `+membership+`))`)
 			args = append(args, "{title url organization} : ("+match+")", now, "feed_content : ("+match+")", now, "fulltext : ("+match+")")
 		}
 	}
@@ -291,7 +312,7 @@ func (s *Service) Changes(ctx context.Context, after string, limit int) (ChangeP
 		return out, ErrInvalid
 	}
 	if limit == 0 {
-		limit = 100
+		limit = 50
 	}
 	if limit < 1 || limit > 200 {
 		return out, ErrInvalid
@@ -363,7 +384,7 @@ func (s *Service) PutArtifact(ctx context.Context, a Artifact) (Artifact, error)
 		if valid == 0 {
 			return fmt.Errorf("%w: content basis changed or expired", ErrConflict)
 		}
-		a.CreatedAt = s.Now()
+		a.CreatedAt = s.Now().UTC()
 		a.Version = 1
 		r, e := tx.ExecContext(ctx, `INSERT INTO artifacts(article_id,actor,external_id,kind,content,basis_hash,created_at)VALUES(?,?,?,?,?,?,?)`, a.ArticleID, a.Actor, a.ExternalID, a.Kind, a.Content, a.BasisHash, stamp(a.CreatedAt))
 		if e != nil {

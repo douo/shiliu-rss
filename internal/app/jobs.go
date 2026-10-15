@@ -145,6 +145,13 @@ func (s *Service) finish(ctx context.Context, tx *sql.Tx, j Job) error {
 	return e
 }
 func (s *Service) CompleteFeedJob(ctx context.Context, jobID, owner string, result FeedResult) error {
+	if !result.NotModified {
+		prepared, err := prepareEntries(result.Entries)
+		if err != nil {
+			return err
+		}
+		result.Entries = prepared
+	}
 	return s.write(ctx, func(tx *sql.Tx) error {
 		j, e := s.leasedJob(ctx, tx, jobID, owner)
 		if e != nil {
@@ -167,7 +174,7 @@ func (s *Service) CompleteFeedJob(ctx context.Context, jobID, owner string, resu
 		}
 		spread := time.Duration(interval) * time.Hour / 5
 		next := s.Now().Add(time.Duration(interval)*time.Hour - spread + time.Duration(rand.Int64N(int64(2*spread)+1)))
-		_, e = tx.ExecContext(ctx, `UPDATE feeds SET title=CASE WHEN ?='' THEN title ELSE ? END,site_url=CASE WHEN ?='' THEN site_url ELSE ? END,etag=?,last_modified=?,last_success_at=?,next_check_at=?,error='',version=version+1 WHERE id=?`, result.Title, result.Title, result.SiteURL, result.SiteURL, result.ETag, result.LastModified, stamp(s.Now()), stamp(next), j.TargetID)
+		_, e = tx.ExecContext(ctx, `UPDATE feeds SET title=CASE WHEN ?='' THEN title ELSE ? END,site_url=CASE WHEN ?='' THEN site_url ELSE ? END,etag=CASE WHEN ? AND ?='' THEN etag ELSE ? END,last_modified=CASE WHEN ? AND ?='' THEN last_modified ELSE ? END,last_success_at=?,next_check_at=?,error='',version=version+1 WHERE id=?`, result.Title, result.Title, result.SiteURL, result.SiteURL, result.NotModified, result.ETag, result.ETag, result.NotModified, result.LastModified, result.LastModified, stamp(s.Now()), stamp(next), j.TargetID)
 		if e != nil {
 			return e
 		}
@@ -228,6 +235,9 @@ func (s *Service) FailJob(ctx context.Context, jobID, owner, reason string, retr
 	return s.write(ctx, func(tx *sql.Tx) error {
 		j, e := s.leasedJob(ctx, tx, jobID, owner)
 		if e != nil {
+			return e
+		}
+		if e = s.saveHostCooldown(ctx, tx); e != nil {
 			return e
 		}
 		delays := []time.Duration{15 * time.Minute, time.Hour, 4 * time.Hour, 6 * time.Hour}

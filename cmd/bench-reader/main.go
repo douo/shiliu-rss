@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"shiliu-rss/internal/app"
+	"shiliu-rss/internal/importer"
 	"shiliu-rss/internal/store"
 )
 
@@ -42,6 +43,20 @@ type report struct {
 	HeapBytes       uint64             `json:"heap_bytes"`
 	Queries         map[string]latency `json:"queries"`
 	Notes           []string           `json:"notes"`
+	Maintenance     *maintenanceReport `json:"maintenance,omitempty"`
+}
+type maintenanceReport struct {
+	BackupSeconds    float64 `json:"backup_seconds"`
+	RestoreSeconds   float64 `json:"restore_seconds"`
+	BackupBytes      int64   `json:"backup_bytes"`
+	RestoredDBBytes  int64   `json:"restored_db_bytes"`
+	SourceFeeds      int     `json:"source_feeds"`
+	SourceArticles   int     `json:"source_articles"`
+	SourceBodies     int     `json:"source_bodies"`
+	RestoredFeeds    int     `json:"restored_feeds"`
+	RestoredArticles int     `json:"restored_articles"`
+	RestoredBodies   int     `json:"restored_bodies"`
+	IntegrityPassed  bool    `json:"integrity_passed"`
 }
 
 func main() {
@@ -57,6 +72,7 @@ func run() error {
 	bodyBytes := flag.Int("body-bytes", 26214, "approximate HTML bytes per source body")
 	samples := flag.Int("samples", 30, "query repetitions")
 	output := flag.String("output", "", "JSON report path (stdout always prints report)")
+	maintenance := flag.Bool("maintenance", false, "also verify a consistent backup and cleaned restore before deleting synthetic fixtures")
 	flag.Parse()
 	if *feeds < 1 || *articles < 1 || *bodies < 0 || *bodies > *articles || *bodyBytes < 100 || *samples < 1 {
 		return fmt.Errorf("invalid scale")
@@ -123,7 +139,7 @@ func run() error {
 	} else {
 		r.Notes = append(r.Notes, "SQLite dbstat is unavailable; separate index size was not measured.")
 	}
-	for name, q := range map[string]app.ArticleQuery{"list_50": {Limit: 50}, "chinese_music": {Query: "音乐", Limit: 50}, "english_sqlite": {Query: "SQLite", Limit: 50}, "single_han": {Query: "音", Limit: 50}} {
+	for name, q := range map[string]app.ArticleQuery{"list_50": {Limit: 50}, "chinese_music": {Query: "音乐", Limit: 50}, "english_sqlite": {Query: "SQLite", Limit: 50}, "single_han": {Query: "音", Limit: 50}, "sparse_title": {Query: "000001", Limit: 50}} {
 		if _, e = s.ListArticles(ctx, q); e != nil {
 			return e
 		}
@@ -149,6 +165,61 @@ func run() error {
 	if b, e := exec.Command("ps", "-o", "rss=", "-p", strconv.Itoa(os.Getpid())).Output(); e == nil {
 		kb, _ := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
 		r.RSSBytes = kb * 1024
+	}
+	if *maintenance {
+		fmt.Fprintln(os.Stderr, "starting synthetic backup/restore maintenance drill")
+		m := &maintenanceReport{}
+		for query, target := range map[string]*int{`SELECT count(*) FROM feeds`: &m.SourceFeeds, `SELECT count(*) FROM articles`: &m.SourceArticles, `SELECT count(*) FROM article_content WHERE state='available'`: &m.SourceBodies} {
+			if e = st.Read.QueryRowContext(ctx, query).Scan(target); e != nil {
+				return e
+			}
+		}
+		begin := time.Now()
+		backup, e := importer.Backup(ctx, s, filepath.Join(dir, "backups"), time.Now())
+		if e != nil {
+			return e
+		}
+		m.BackupSeconds = time.Since(begin).Seconds()
+		if info, e := os.Stat(backup); e != nil {
+			return e
+		} else {
+			m.BackupBytes = info.Size()
+		}
+		restoredPath := filepath.Join(dir, "restored.db")
+		begin = time.Now()
+		if e = importer.Restore(ctx, backup, restoredPath, time.Now()); e != nil {
+			return e
+		}
+		m.RestoreSeconds = time.Since(begin).Seconds()
+		if info, e := os.Stat(restoredPath); e != nil {
+			return e
+		} else {
+			m.RestoredDBBytes = info.Size()
+		}
+		restored, e := store.Open(ctx, restoredPath)
+		if e != nil {
+			return e
+		}
+		for query, target := range map[string]*int{`SELECT count(*) FROM feeds`: &m.RestoredFeeds, `SELECT count(*) FROM articles`: &m.RestoredArticles, `SELECT count(*) FROM article_content WHERE state='available'`: &m.RestoredBodies} {
+			if e = restored.Read.QueryRowContext(ctx, query).Scan(target); e != nil {
+				restored.Close()
+				return e
+			}
+		}
+		if e = app.New(restored).Integrity(ctx); e != nil {
+			restored.Close()
+			return e
+		}
+		if e = restored.Close(); e != nil {
+			return e
+		}
+		if m.SourceFeeds != m.RestoredFeeds || m.SourceArticles != m.RestoredArticles || m.SourceBodies != m.RestoredBodies {
+			return fmt.Errorf("maintenance count reconciliation failed")
+		}
+		m.IntegrityPassed = true
+		r.Maintenance = m
+		r.Notes = append(r.Notes, "Maintenance elapsed includes consistency/integrity validation and filesystem synchronization; restore performs lifecycle cleanup before publication. Fresh synthetic bodies remain within retention. Temporary source/backup/restored databases are removed after the run.")
+		fmt.Fprintf(os.Stderr, "backup %.2fs, restore %.2fs; restored %d articles/%d bodies\n", m.BackupSeconds, m.RestoreSeconds, m.RestoredArticles, m.RestoredBodies)
 	}
 	b, e := json.MarshalIndent(r, "", "  ")
 	if e != nil {

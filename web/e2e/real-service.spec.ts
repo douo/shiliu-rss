@@ -28,7 +28,16 @@ test('real API: subscription → background ingestion → reading → full text 
     !process.env.SHILIU_E2E_PASSWORD,
     'Set SHILIU_E2E_PASSWORD and start an isolated local API.'
   );
-  await page.goto('/');
+  const cspErrors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' && /Content Security Policy|script-src/.test(message.text()))
+      cspErrors.push(message.text());
+  });
+  const startup = await page.goto('/');
+  if (process.env.SHILIU_E2E_URL) {
+    expect(startup?.headers()['content-security-policy']).toContain("script-src 'self'");
+    expect(startup?.headers()['content-encoding']).toBe('gzip');
+  }
   await page.getByLabel('登录密码').fill(process.env.SHILIU_E2E_PASSWORD!);
   await page.getByRole('button', { name: '进入拾流' }).click();
   await expect(page.getByRole('heading', { name: '近期文章', exact: true })).toBeVisible();
@@ -73,6 +82,7 @@ test('real API: subscription → background ingestion → reading → full text 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true
   );
+  expect(cspErrors).toEqual([]);
   await page.screenshot({
     path: `test-results/${info.project.name}-real-service.png`,
     fullPage: true

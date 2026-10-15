@@ -18,7 +18,10 @@ func (s *Service) RetentionPreview(ctx context.Context, overrides ...Feed) (Rete
 	}
 	if len(overrides) == 1 {
 		f := overrides[0]
-		query = `SELECT count(DISTINCT a.id),count(*),COALESCE(sum(length(c.html)+length(c.text)),0) FROM article_content c JOIN articles a ON a.id=c.article_id JOIN feeds f ON f.id=a.feed_id WHERE c.state='available' AND a.favorite=0 AND CASE WHEN f.id=? THEN ? ELSE f.archive END=0 AND max(c.expires_at,COALESCE(a.protection_until,''))<=?`
+		if f.ID == "" {
+			return out, ErrInvalid
+		}
+		query = `SELECT count(DISTINCT a.id),count(*),COALESCE(sum(length(c.html)+length(c.text)),0) FROM article_content c JOIN articles a ON a.id=c.article_id JOIN feeds f ON f.id=a.feed_id WHERE f.id=? AND c.state='available' AND a.favorite=0 AND ?=0 AND max(c.expires_at,COALESCE(a.protection_until,''))<=?`
 		args = append(args, f.ID, f.Archive, stamp(s.Now()))
 	} else {
 		query = `SELECT count(DISTINCT a.id),count(*),COALESCE(sum(length(c.html)+length(c.text)),0) FROM article_content c JOIN articles a ON a.id=c.article_id JOIN feeds f ON f.id=a.feed_id WHERE ` + expiredContent

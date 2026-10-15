@@ -33,7 +33,7 @@ func New(s *store.Store, clock ...func() time.Time) *Service {
 	if len(clock) > 0 && clock[0] != nil {
 		now = clock[0]
 	}
-	return &Service{Store: s, Now: now}
+	return &Service{Store: s, Now: func() time.Time { return now().UTC() }}
 }
 func stamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000000000Z") }
 func parse(s string) time.Time { t, _ := time.Parse(time.RFC3339Nano, s); return t }

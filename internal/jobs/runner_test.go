@@ -138,3 +138,57 @@ func TestSiteGateDefersWithoutUsingAttempt(t *testing.T) {
 		t.Fatal(j, e)
 	}
 }
+
+func TestManualFulltextCannotBypassPersistedHostCooldown(t *testing.T) {
+	ctx := context.Background()
+	db, e := store.Open(ctx, filepath.Join(t.TempDir(), "reader.db"))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer db.Close()
+	a := app.New(db)
+	var calls atomic.Int64
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(429)
+	}))
+	defer srv.Close()
+	f, e := a.CreateFeed(ctx, app.Feed{Title: "limited", URL: srv.URL, AllowHost: "127.0.0.1"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	ids, e := a.IngestFeed(ctx, f.ID, []app.FeedEntry{{GUID: "a", Title: "a", URL: srv.URL + "/article", HTML: "<p>Existing summary</p>"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	_, _ = a.QueueFeed(ctx, f.ID)
+	j, e := a.ClaimJob(ctx, "first", 2*time.Minute)
+	if e != nil {
+		t.Fatal(e)
+	}
+	runner := New(a, fetch.New())
+	runner.Execute(ctx, j)
+	until, e := a.HostCooldown(ctx, "127.0.0.1")
+	if e != nil || time.Until(until) < 59*time.Minute {
+		t.Fatal(until, e)
+	}
+	full, e := a.QueueFulltext(ctx, ids[0])
+	if e != nil {
+		t.Fatal(e)
+	}
+	j, e = a.ClaimJob(ctx, "manual", 2*time.Minute)
+	if e != nil {
+		t.Fatal(e)
+	}
+	runner = New(a, fetch.New())
+	runner.Execute(ctx, j)
+	got, e := a.GetJob(ctx, full.ID)
+	if e != nil || got.State != "queued" || got.Attempts != 0 || got.DueAt.Before(until) || calls.Load() != 1 {
+		t.Fatalf("cooldown bypass %+v calls=%d err=%v", got, calls.Load(), e)
+	}
+	article, e := a.GetArticle(ctx, ids[0])
+	if e != nil || article.Content[0].State != "available" {
+		t.Fatal("existing summary overwritten", e)
+	}
+}

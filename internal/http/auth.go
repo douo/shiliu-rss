@@ -208,7 +208,7 @@ type loginGuard struct {
 }
 
 func (s *Server) Login(ctx context.Context, r api.LoginRequestObject) (api.LoginResponseObject, error) {
-	if r.Body == nil || len(r.Body.Password) > 1024 {
+	if r.Body == nil || len(r.Body.Password) == 0 || len(r.Body.Password) > 1024 {
 		return nil, app.ErrInvalid
 	}
 	x := ctx.Value(requestKey{}).(exchange)
@@ -304,20 +304,32 @@ func (s *Server) CreateToken(ctx context.Context, r api.CreateTokenRequestObject
 	value := random()
 	v := api.Token{Id: random(), Name: r.Body.Name, Scopes: r.Body.Scopes, CreatedAt: s.App.Now()}
 	encoded, _ := json.Marshal(v.Scopes)
-	_, e := s.App.Store.Write.ExecContext(ctx, `INSERT INTO tokens(id,name,hash,scopes,created_at)VALUES(?,?,?,?,?)`, v.Id, v.Name, digest(value), string(encoded), date(v.CreatedAt))
+	e := s.authorizedWrite(ctx, func(tx *sql.Tx) error {
+		_, err := tx.ExecContext(ctx, `INSERT INTO tokens(id,name,hash,scopes,created_at)VALUES(?,?,?,?,?)`, v.Id, v.Name, digest(value), string(encoded), date(v.CreatedAt))
+		return err
+	})
 	if e != nil {
 		return nil, e
 	}
 	return api.CreateToken201JSONResponse{Token: value, Record: v}, nil
 }
 func (s *Server) RevokeToken(ctx context.Context, r api.RevokeTokenRequestObject) (api.RevokeTokenResponseObject, error) {
-	res, e := s.App.Store.Write.ExecContext(ctx, `UPDATE tokens SET revoked_at=COALESCE(revoked_at,?) WHERE id=?`, date(s.App.Now()), r.Id)
+	e := s.authorizedWrite(ctx, func(tx *sql.Tx) error {
+		res, err := tx.ExecContext(ctx, `UPDATE tokens SET revoked_at=COALESCE(revoked_at,?) WHERE id=?`, date(s.App.Now()), r.Id)
+		if err != nil {
+			return err
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return app.ErrNotFound
+		}
+		return nil
+	})
 	if e != nil {
 		return nil, e
-	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return nil, app.ErrNotFound
 	}
 	return api.RevokeToken204Response{}, nil
 }
@@ -355,4 +367,19 @@ func convert[T any](v any) (T, error) {
 		return out, fmt.Errorf("response conversion: %w", e)
 	}
 	return out, nil
+}
+
+func (s *Server) authorizedWrite(ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, e := s.App.Store.Write.BeginTx(ctx, nil)
+	if e != nil {
+		return e
+	}
+	defer tx.Rollback()
+	if e = s.checkCredential(getPrincipal(ctx))(ctx, tx); e != nil {
+		return e
+	}
+	if e = fn(tx); e != nil {
+		return e
+	}
+	return tx.Commit()
 }

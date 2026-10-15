@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Run browser acceptance against the embedded Go release using isolated data."""
+import os
+import pathlib
+import secrets
+import socket
+import subprocess
+import tempfile
+import time
+import urllib.request
+
+root = pathlib.Path(__file__).resolve().parent.parent
+os.chdir(root)
+config = dict(line.split('=', 1) for line in (root / 'config/dev.env').read_text().splitlines() if line and not line.startswith('#'))
+host, port = config['SHILIU_ADDR'].rsplit(':', 1)
+with socket.socket() as probe:
+    if probe.connect_ex((host, int(port))) == 0:
+        raise SystemExit('Stop the local reader first: its registered API port is occupied.')
+with tempfile.TemporaryDirectory(prefix='shiliu-browser-') as temp:
+    password = secrets.token_urlsafe(24)
+    password_file = pathlib.Path(temp) / 'password'
+    password_file.write_text(password)
+    password_file.chmod(0o600)
+    origin = f'http://{host}:{port}'
+    env = os.environ | {'SHILIU_DB': str(pathlib.Path(temp) / 'reader.db'), 'SHILIU_PASSWORD_FILE': str(password_file), 'SHILIU_ADDR': config['SHILIU_ADDR'], 'SHILIU_ORIGIN': origin, 'SHILIU_COOKIE_SECURE': 'false', 'SHILIU_E2E_URL': origin, 'SHILIU_E2E_PASSWORD': password}
+    subprocess.run([str(root / 'dist/reader'), 'init'], env=env, check=True)
+    server = subprocess.Popen([str(root / 'dist/reader'), 'serve'], env=env)
+    try:
+        for attempt in range(100):
+            try:
+                with urllib.request.urlopen(origin + '/readyz', timeout=1) as response:
+                    if response.status == 200:
+                        break
+            except Exception:
+                if server.poll() is not None:
+                    raise RuntimeError('Reader exited during startup')
+                time.sleep(0.1)
+        else:
+            raise RuntimeError('Reader readiness timed out')
+        subprocess.run(['pnpm', '--dir', 'web', 'test:e2e'], env=env, check=True)
+    finally:
+        server.terminate()
+        try:
+            server.wait(timeout=15)
+        except subprocess.TimeoutExpired:
+            server.kill()
+            server.wait()

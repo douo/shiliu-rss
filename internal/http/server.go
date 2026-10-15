@@ -6,7 +6,9 @@ import (
 	"encoding/xml"
 	"io"
 	"io/fs"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -83,17 +85,31 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 	if path == "" {
 		path = "200.html"
 	}
-	f, e := s.Assets.Open(path)
+	assetPath := path
+	f, e := s.Assets.Open(assetPath)
 	if e != nil {
 		if strings.Contains(path, ".") || strings.HasPrefix(path, "_app/") {
 			http.NotFound(w, r)
 			return
 		}
-		f, e = s.Assets.Open("200.html")
+		assetPath = "200.html"
+		f, e = s.Assets.Open(assetPath)
 	}
 	if e != nil {
 		http.NotFound(w, r)
 		return
+	}
+	originalName := assetPath
+	w.Header().Set("Vary", "Accept-Encoding")
+	for _, encoding := range strings.Split(r.Header.Get("Accept-Encoding"), ",") {
+		if strings.TrimSpace(encoding) == "gzip" {
+			if compressed, err := s.Assets.Open(assetPath + ".gz"); err == nil {
+				f.Close()
+				f = compressed
+				w.Header().Set("Content-Encoding", "gzip")
+			}
+			break
+		}
 	}
 	defer f.Close()
 	st, e := f.Stat()
@@ -111,7 +127,10 @@ func (s *Server) static(w http.ResponseWriter, r *http.Request) {
 	} else {
 		w.Header().Set("Cache-Control", "no-cache")
 	}
-	name := st.Name()
+	name := originalName
+	if kind := mime.TypeByExtension(filepath.Ext(name)); kind != "" {
+		w.Header().Set("Content-Type", kind)
+	}
 	http.ServeContent(w, r, name, time.Time{}, reader)
 }
 func (s *Server) wake() {
@@ -128,6 +147,14 @@ func val[T any](p *T) T {
 }
 func (s *Server) ListArticles(ctx context.Context, r api.ListArticlesRequestObject) (api.ListArticlesResponseObject, error) {
 	p := r.Params
+	if p.Limit != nil && (*p.Limit < 1 || *p.Limit > 200) {
+		return nil, app.ErrInvalid
+	}
+	if p.Q != nil && *p.Q != "" {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+	}
 	if p.Scope != nil && !p.Scope.Valid() {
 		return nil, app.ErrInvalid
 	}
@@ -209,6 +236,9 @@ func (s *Server) GetJob(ctx context.Context, r api.GetJobRequestObject) (api.Get
 	return convert[api.GetJob200JSONResponse](v)
 }
 func (s *Server) ListChanges(ctx context.Context, r api.ListChangesRequestObject) (api.ListChangesResponseObject, error) {
+	if r.Params.Limit != nil && (*r.Params.Limit < 1 || *r.Params.Limit > 200) {
+		return nil, app.ErrInvalid
+	}
 	v, e := s.App.Changes(ctx, val(r.Params.Cursor), val(r.Params.Limit))
 	if e != nil {
 		return nil, e

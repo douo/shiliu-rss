@@ -17,6 +17,7 @@ client.use({
     return request;
   },
   async onResponse({ response }) {
+    if (response.status === 401) window.dispatchEvent(new Event('shiliu:session-expired'));
     if (!response.ok) {
       const problem = await response
         .clone()

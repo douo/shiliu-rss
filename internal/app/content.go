@@ -27,3 +27,26 @@ func CleanContent(raw string) (string, string) {
 	}
 	return safe, strings.Join(strings.Fields(text.String()), " ")
 }
+
+// prepareEntry performs untrusted HTML parsing before a write transaction is
+// acquired. upsertEntry accepts only this prepared application-owned value.
+func prepareEntry(entry FeedEntry) (FeedEntry, error) {
+	if len(entry.HTML) > 8<<20 || len(entry.Text) > 8<<20 {
+		return FeedEntry{}, ErrInvalid
+	}
+	if entry.HTML != "" {
+		entry.HTML, entry.Text = CleanContent(entry.HTML)
+	}
+	return entry, nil
+}
+func prepareEntries(entries []FeedEntry) ([]FeedEntry, error) {
+	out := make([]FeedEntry, len(entries))
+	for i, entry := range entries {
+		prepared, e := prepareEntry(entry)
+		if e != nil {
+			return nil, e
+		}
+		out[i] = prepared
+	}
+	return out, nil
+}

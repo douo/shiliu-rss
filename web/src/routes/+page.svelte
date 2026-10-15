@@ -47,12 +47,30 @@
     settingsOpen = $state(false),
     SettingsComponent = $state<typeof import('../lib/Settings.svelte').default | null>(null),
     shortcutOpen = $state(false),
-    activeIndex = $state(0);
+    activeIndex = $state(0),
+    unfavoriteTarget = $state<Article | null>(null);
   let listElement = $state<HTMLDivElement>(),
     searchElement = $state<HTMLInputElement>();
   let scrollPosition = 0,
     loadGeneration = 0,
-    openGeneration = 0;
+    openGeneration = 0,
+    sessionEpoch = 0;
+  let sessionChannel: BroadcastChannel | undefined;
+  function clearSession() {
+    sessionEpoch++;
+    openGeneration++;
+    loadGeneration++;
+    authenticated = false;
+    selected = null;
+    articles = [];
+    feeds = [];
+    categories = [];
+    settingsOpen = false;
+    SettingsComponent = null;
+    unfavoriteTarget = null;
+    password = '';
+    ready = true;
+  }
   const title = $derived(
     query
       ? '搜索结果'
@@ -74,10 +92,20 @@
     ...(categoryID ? { category_id: categoryID } : {}),
     ...(query ? { q: query } : {}),
     ...(read ? { read } : {}),
-    ...(from ? { from: new Date(from).toISOString() } : {}),
-    ...(until ? { until: new Date(until + 'T23:59:59').toISOString() } : {}),
+    ...(from ? { from: new Date(`${from}T00:00:00`).toISOString() } : {}),
+    ...(until ? { until: nextDay(until) } : {}),
     limit: '50'
   });
+  function nextDay(day: string) {
+    const date = new Date(`${day}T00:00:00`);
+    date.setDate(date.getDate() + 1);
+    return date.toISOString();
+  }
+  function validDay(value: string | null) {
+    return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value))
+      ? value
+      : '';
+  }
   function syncURL(articleId?: string, replace = false) {
     const p = new URLSearchParams(queryParams());
     p.delete('limit');
@@ -87,20 +115,25 @@
   }
   function readURL() {
     const p = new URLSearchParams(location.search);
-    scope = p.get('scope') || 'recent';
+    scope = ['recent', 'archive', 'all'].includes(p.get('scope') || '')
+      ? p.get('scope')!
+      : 'recent';
     favorite = p.get('favorite') === 'true';
     feedID = p.get('feed_id') || '';
     categoryID = p.get('category_id') || '';
     query = p.get('q') || '';
     searchDraft = query;
-    read = p.get('read') || '';
-    from = p.get('from')?.slice(0, 10) || '';
-    until = p.get('until')?.slice(0, 10) || '';
+    read = ['true', 'false'].includes(p.get('read') || '') ? p.get('read')! : '';
+    from = validDay(p.get('from')?.slice(0, 10) || null);
+    until = validDay(p.get('until')?.slice(0, 10) || null);
     settingsOpen = p.get('settings') === 'true';
     return p.get('article');
   }
   async function sources() {
-    [feeds, categories] = await Promise.all([api.feeds(), api.categories()]);
+    const epoch = sessionEpoch;
+    const result = await Promise.all([api.feeds(), api.categories()]);
+    if (epoch !== sessionEpoch) return;
+    [feeds, categories] = result;
     feeds ||= [];
     categories ||= [];
   }
@@ -126,9 +159,7 @@
   function handleError(e: unknown) {
     error = (e as Error).message;
     if (e instanceof APIError && e.status === 401) {
-      authenticated = false;
-      selected = null;
-      articles = [];
+      clearSession();
     }
   }
   async function login(e: SubmitEvent) {
@@ -206,19 +237,27 @@
       .querySelector<HTMLButtonElement>(`[data-article-id="${articles[activeIndex]?.id}"]`)
       ?.focus({ preventScroll: true });
   }
-  async function patch(value: ArticlePatch) {
+  async function patch(value: ArticlePatch, confirmed = false) {
     if (!selected) return;
+    if (value.favorite === false && !confirmed) {
+      unfavoriteTarget = selected;
+      return;
+    }
+    const target = selected,
+      epoch = sessionEpoch;
     try {
       const updated = Object.keys(value).length
-        ? await api.patch(selected, value)
-        : await api.article(selected.id);
-      selected = updated;
+        ? await api.patch(target, value)
+        : await api.article(target.id);
+      if (epoch !== sessionEpoch) return;
+      if (selected?.id === target.id) selected = updated;
       articles = articles.map((a) =>
         a.id === updated.id ? { ...a, ...updated, content: undefined, artifacts: undefined } : a
       );
     } catch (e) {
       handleError(e);
-      if (e instanceof APIError && e.status === 412) selected = await api.article(selected.id);
+      if (e instanceof APIError && e.status === 412 && selected?.id === target.id)
+        selected = await api.article(target.id);
       throw e;
     }
   }
@@ -230,9 +269,11 @@
   async function bulkRead() {
     busy = true;
     error = '';
+    const epoch = sessionEpoch;
     try {
       for (const a of articles.filter((a) => !a.read_at)) {
         const updated = await api.patch(a, { read: true });
+        if (epoch !== sessionEpoch) return;
         articles = articles.map((x) => (x.id === a.id ? updated : x));
       }
     } catch (e) {
@@ -256,14 +297,8 @@
   async function logout() {
     try {
       await api.logout();
-      authenticated = false;
-      selected = null;
-      articles = [];
-      feeds = [];
-      categories = [];
-      settingsOpen = false;
-      SettingsComponent = null;
-      password = '';
+      clearSession();
+      sessionChannel?.postMessage('logout');
       void goto('/', { shallow: true, replace: true, reset: false });
     } catch (e) {
       handleError(e);
@@ -277,7 +312,8 @@
       return;
     }
     if (e.key === 'Escape') {
-      if (shortcutOpen) shortcutOpen = false;
+      if (unfavoriteTarget) unfavoriteTarget = null;
+      else if (shortcutOpen) shortcutOpen = false;
       else if (selected) closeReader();
       else if (settingsOpen) {
         settingsOpen = false;
@@ -285,7 +321,7 @@
       } else navOpen = false;
       return;
     }
-    if (settingsOpen) return;
+    if (settingsOpen || shortcutOpen || unfavoriteTarget) return;
     if (e.key === '/') {
       e.preventDefault();
       searchElement?.focus();
@@ -345,10 +381,20 @@
         ready = true;
       }
     })();
+    const expired = () => clearSession();
+    window.addEventListener('shiliu:session-expired', expired);
+    if ('BroadcastChannel' in window) {
+      sessionChannel = new BroadcastChannel('shiliu-session');
+      sessionChannel.onmessage = (e) => {
+        if (e.data === 'logout') clearSession();
+      };
+    }
     window.addEventListener('popstate', pop);
     return () => {
       disposed = true;
       window.removeEventListener('popstate', pop);
+      window.removeEventListener('shiliu:session-expired', expired);
+      sessionChannel?.close();
     };
   });
   function clearExpired() {
@@ -375,18 +421,43 @@
       return () => clearTimeout(timer);
     }
   });
+  let revalidating = false;
+  function hidePrivatePage() {
+    if (authenticated) {
+      ready = false;
+      if (selected) selected = { ...selected, content: undefined };
+      SettingsComponent = null;
+    }
+  }
   async function revalidate() {
-    if (!authenticated || document.visibilityState === 'hidden') return;
-    clearExpired();
-    if (selected) {
-      const id = selected.id;
-      selected = { ...selected, content: undefined };
-      try {
-        const updated = await api.article(id);
-        if (selected?.id === id) selected = updated;
-      } catch (e) {
-        handleError(e);
+    if (document.visibilityState === 'hidden' || revalidating) return;
+    revalidating = true;
+    const epoch = sessionEpoch;
+    try {
+      const session = await api.session();
+      if (epoch !== sessionEpoch) return;
+      if (!session.authenticated) {
+        clearSession();
+        return;
       }
+      authenticated = true;
+      clearExpired();
+      if (selected) {
+        const id = selected.id;
+        selected = { ...selected, content: undefined };
+        const updated = await api.article(id);
+        if (epoch === sessionEpoch && selected?.id === id) selected = updated;
+      }
+      if (!ready) {
+        await sources();
+        await list();
+        if (settingsOpen) SettingsComponent = (await import('../lib/Settings.svelte')).default;
+      }
+    } catch (e) {
+      handleError(e);
+    } finally {
+      ready = true;
+      revalidating = false;
     }
   }
   function date(value: string) {
@@ -400,9 +471,12 @@
     content="拾流 RSS，留住值得阅读的内容。"
   /></svelte:head
 >
-<svelte:window onkeydown={keyboard} onfocus={revalidate} onpageshow={revalidate} /><svelte:document
-  onvisibilitychange={revalidate}
-/>
+<svelte:window
+  onkeydown={keyboard}
+  onfocus={revalidate}
+  onpageshow={revalidate}
+  onpagehide={hidePrivatePage}
+/><svelte:document onvisibilitychange={revalidate} />
 {#if !ready}<main class="startup">
     <img src="/icon.svg" alt="" /><LoaderCircle class="spin" size={20} />
     <p>正在打开拾流…</p>
@@ -699,3 +773,49 @@
         </div>{/each}
     </div>
   </div>{/if}
+
+{#if unfavoriteTarget}
+  <div class="modal-shade">
+    <div
+      use:modal={() => {
+        unfavoriteTarget = null;
+      }}
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="unfavorite-title"
+      tabindex="-1"
+    >
+      <div class="section-title">
+        <h2 id="unfavorite-title">取消收藏前</h2>
+        <button
+          class="icon-button"
+          aria-label="保留收藏"
+          onclick={() => {
+            unfavoriteTarget = null;
+          }}><X size={19} /></button
+        >
+      </div>
+      <p class="form-help">
+        {feeds.find((f) => f.id === unfavoriteTarget!.feed_id)?.archive
+          ? '这个源使用长期存档，当前正文继续受源策略保护。取消收藏后，文章仍会按可见期限进入归档。'
+          : '取消收藏后恢复来源的可见期限与普通正文保存策略。已到期文章可能立即从近期隐藏，已到期正文可能立即不可读。'}笔记、标签与
+        Agent 摘要会继续保留。
+      </p>
+      <div class="button-row">
+        <button
+          class="button secondary"
+          onclick={() => {
+            unfavoriteTarget = null;
+          }}>保留收藏</button
+        ><button
+          class="button"
+          onclick={() => {
+            unfavoriteTarget = null;
+            void patch({ favorite: false }, true).catch(() => {});
+          }}>确认取消收藏</button
+        >
+      </div>
+    </div>
+  </div>
+{/if}

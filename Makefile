@@ -1,11 +1,14 @@
-.PHONY: setup init dev generate check-generated check test test-web build build-linux verify clean
+.PHONY: setup init dev run generate check-generated check test test-web build build-linux verify clean
 setup:
 	go mod download
 	pnpm --dir web install --frozen-lockfile
+	pnpm --dir web exec playwright install chromium
 init:
 	./scripts/init
 dev:
 	./scripts/dev
+run: build
+	./scripts/run
 generate:
 	./scripts/generate
 check-generated:
@@ -15,8 +18,8 @@ check:
 	pnpm --dir web check
 test:
 	go test -race ./...
-test-web:
-	pnpm --dir web test:e2e
+test-web: build
+	./scripts/test-browser
 build:
 	pnpm --dir web build
 	mkdir -p dist

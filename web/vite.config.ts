@@ -13,7 +13,7 @@ const env = Object.fromEntries(
 export default defineConfig({
   plugins: [
     tailwindcss(),
-    sveltekit({ preprocess: vitePreprocess(), adapter: adapter({ fallback: 'index.html' }) })
+    sveltekit({ preprocess: vitePreprocess(), adapter: adapter({ fallback: '200.html' }) })
   ],
   server: {
     host: '127.0.0.1',

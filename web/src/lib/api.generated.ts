@@ -323,6 +323,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @example {
+         *       "type": "urn:shiliu:error:version_mismatch",
+         *       "title": "Precondition Failed",
+         *       "status": 412,
+         *       "code": "version_mismatch",
+         *       "request_id": "synthetic-request-id",
+         *       "retryable": false
+         *     }
+         */
         Problem: {
             type: string;
             title: string;
@@ -332,6 +342,12 @@ export interface components {
             request_id: string;
             retryable: boolean;
         };
+        /**
+         * @example {
+         *       "authenticated": true,
+         *       "csrf_token": "synthetic-csrf-placeholder"
+         *     }
+         */
         Session: {
             authenticated: boolean;
             csrf_token: string;
@@ -370,6 +386,16 @@ export interface components {
             /** Format: date-time */
             next_check_at: string;
         };
+        /**
+         * @example {
+         *       "url": "https://example.org/feed.xml",
+         *       "title": "示例订阅",
+         *       "archive": false,
+         *       "interval_hours": 5,
+         *       "read_days": 7,
+         *       "unread_days": 30
+         *     }
+         */
         FeedInput: {
             url: string;
             title: string;
@@ -444,6 +470,12 @@ export interface components {
             content?: components["schemas"]["Content"][];
             artifacts?: components["schemas"]["Artifact"][];
         };
+        /**
+         * @example {
+         *       "version": 3,
+         *       "favorite": true
+         *     }
+         */
         ArticlePatch: {
             /** Format: int64 */
             version: number;
@@ -461,6 +493,14 @@ export interface components {
             ids: string[];
             read: boolean;
         };
+        /**
+         * @example {
+         *       "external_id": "article-42-summary-v1",
+         *       "kind": "summary",
+         *       "content": "这是整理后的摘要。",
+         *       "basis_hash": "use-content_hash-from-getArticle"
+         *     }
+         */
         ArtifactInput: {
             external_id: string;
             kind: string;
@@ -508,6 +548,15 @@ export interface components {
             /** Format: date-time */
             revoked_at: string | null;
         };
+        /**
+         * @example {
+         *       "name": "摘要助手",
+         *       "scopes": [
+         *         "articles:read",
+         *         "artifacts:write"
+         *       ]
+         *     }
+         */
         TokenInput: {
             name: string;
             scopes: string[];
@@ -655,6 +704,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     login: {
@@ -744,6 +802,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -841,6 +908,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     listCategories: {
@@ -926,6 +1002,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1029,6 +1114,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     deleteCategory: {
@@ -1116,6 +1210,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1221,6 +1324,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     listFeeds: {
@@ -1306,6 +1418,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1409,6 +1530,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     deleteFeed: {
@@ -1496,6 +1626,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1601,6 +1740,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     refreshFeed: {
@@ -1690,6 +1838,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1800,6 +1957,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     getArticle: {
@@ -1887,6 +2053,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -1992,6 +2167,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     bulkRead: {
@@ -2079,6 +2263,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2175,6 +2368,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2282,6 +2484,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     getJob: {
@@ -2369,6 +2580,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2471,6 +2691,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     listTokens: {
@@ -2556,6 +2785,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2659,6 +2897,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     revokeToken: {
@@ -2744,6 +2991,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2847,6 +3103,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     getHealth: {
@@ -2932,6 +3197,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3031,6 +3305,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description Request timeout or unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     importOPML: {
@@ -3120,6 +3403,15 @@ export interface operations {
             };
             /** @description Internal error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request timeout or unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

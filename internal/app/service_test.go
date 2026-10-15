@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -422,5 +423,336 @@ func TestPauseRevokesRunningLeaseAndResumeSchedules(t *testing.T) {
 	job, e = s.GetJob(ctx, claim.ID)
 	if e != nil || job.Attempts != 0 || job.State != "queued" {
 		t.Fatal(job, e)
+	}
+}
+
+func TestBroadSearchStrategyHonorsContentDeadlineAndLiteralInput(t *testing.T) {
+	ctx := context.Background()
+	s, clock := testService(t)
+	f := feedFixture(t, s)
+	entries := make([]FeedEntry, 250)
+	for i := range entries {
+		entries[i] = entryFixture(fmt.Sprintf("广泛标题%d", i))
+	}
+	if _, e := s.IngestFeed(ctx, f.ID, entries); e != nil {
+		t.Fatal(e)
+	}
+	p, e := s.ListArticles(ctx, ArticleQuery{Scope: "all", Query: "音乐", Limit: 50})
+	if e != nil || len(p.Items) != 50 || p.NextCursor == "" {
+		t.Fatal(len(p.Items), e)
+	}
+	*clock = clock.AddDate(0, 0, 91)
+	p, e = s.ListArticles(ctx, ArticleQuery{Scope: "all", Query: "音乐"})
+	if e != nil || len(p.Items) != 0 {
+		t.Fatal("expired broad source match", len(p.Items), e)
+	}
+	p, e = s.ListArticles(ctx, ArticleQuery{Scope: "all", Query: "广泛"})
+	if e != nil || len(p.Items) != 50 {
+		t.Fatal("retained broad title", len(p.Items), e)
+	}
+	for _, query := range []string{`"`, `OR`, `-`, `title:音乐`, `音乐 OR 标题`} {
+		if _, e = s.ListArticles(ctx, ArticleQuery{Scope: "all", Query: query}); e != nil {
+			t.Fatalf("literal %q: %v", query, e)
+		}
+	}
+}
+
+func TestRetentionPreviewOverrideOnlyCountsRequestedFeed(t *testing.T) {
+	ctx := context.Background()
+	s, clock := testService(t)
+	one := feedFixture(t, s)
+	two, e := s.CreateFeed(ctx, Feed{URL: "https://other.test/feed", Title: "另一个源"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	addFixture(t, s, one, "源一")
+	addFixture(t, s, two, "源二")
+	*clock = clock.AddDate(0, 0, 91)
+	all, e := s.RetentionPreview(ctx)
+	if e != nil || all.Articles != 2 {
+		t.Fatal(all, e)
+	}
+	preview, e := s.RetentionPreview(ctx, one)
+	if e != nil || preview.Articles != 1 || preview.Contents != 1 {
+		t.Fatal(preview, e)
+	}
+	one.Archive = true
+	preview, e = s.RetentionPreview(ctx, one)
+	if e != nil || preview.Articles != 0 || preview.Contents != 0 || preview.Bytes != 0 {
+		t.Fatal("other feed leaked into preview", preview, e)
+	}
+	all, e = s.RetentionPreview(ctx)
+	if e != nil || all.Articles != 2 {
+		t.Fatal("preview changed real policy", all, e)
+	}
+}
+func TestUntrustedContentPreparedBeforeTransactionForEveryEntryPoint(t *testing.T) {
+	ctx := context.Background()
+	s, _ := testService(t)
+	f := feedFixture(t, s)
+	huge := entryFixture("超限")
+	huge.HTML = strings.Repeat("x", 8<<20+1)
+	checked := false
+	guard := WithAuthorization(ctx, func(context.Context, *sql.Tx) error { checked = true; return nil })
+	if _, e := s.IngestFeed(guard, f.ID, []FeedEntry{huge}); !errors.Is(e, ErrInvalid) || checked {
+		t.Fatal("ingest opened transaction before content validation", e)
+	}
+	if _, e := s.ImportArticle(guard, ImportArticleInput{SourceInstance: "synthetic", SourceID: "oversized", FeedID: f.ID, Entry: huge}); !errors.Is(e, ErrInvalid) || checked {
+		t.Fatal("import opened transaction before content validation", e)
+	}
+	j, e := s.QueueFeed(ctx, f.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.ClaimJob(ctx, "worker", time.Minute); e != nil {
+		t.Fatal(e)
+	}
+	if e = s.CompleteFeedJob(guard, j.ID, "worker", FeedResult{Entries: []FeedEntry{huge}}); !errors.Is(e, ErrInvalid) || checked {
+		t.Fatal("completion opened transaction before content validation", e)
+	}
+	dirty := entryFixture("净化")
+	dirty.HTML = `<p>safe 音乐</p><script>alert(1)</script><img src=x onerror=alert(1)>`
+	if e = s.CompleteFeedJob(ctx, j.ID, "worker", FeedResult{Entries: []FeedEntry{dirty}}); e != nil {
+		t.Fatal(e)
+	}
+	im, e := s.ImportArticle(ctx, ImportArticleInput{SourceInstance: "synthetic", SourceID: "safe", FeedID: f.ID, Entry: FeedEntry{GUID: "import-safe", Title: "迁入净化", HTML: dirty.HTML}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	page, e := s.ListArticles(ctx, ArticleQuery{Scope: "all"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	for _, article := range append(page.Items, im) {
+		detail, e := s.GetArticle(ctx, article.ID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if len(detail.Content) == 0 || strings.Contains(detail.Content[0].HTML, "script") || strings.Contains(detail.Content[0].HTML, "onerror") || strings.Contains(detail.Content[0].Text, "alert") {
+			t.Fatal("unsafe content reached storage", detail.Content)
+		}
+	}
+}
+func TestHostCooldownPersistsAndOnlyExtendsAtomically(t *testing.T) {
+	ctx := context.Background()
+	clock := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+	path := filepath.Join(t.TempDir(), "reader.db")
+	st, e := store.Open(ctx, path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer st.Close()
+	s := New(st, func() time.Time { return clock })
+	f := feedFixture(t, s)
+	j, e := s.QueueFeed(ctx, f.ID)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.ClaimJob(ctx, "worker", time.Minute); e != nil {
+		t.Fatal(e)
+	}
+	until := clock.Add(2 * time.Hour)
+	if e = s.FailJob(WithHostCooldown(ctx, " EXAMPLE.TEST. ", until), j.ID, "worker", "http_429", &until); e != nil {
+		t.Fatal(e)
+	}
+	got, e := s.HostCooldown(ctx, "example.test")
+	if e != nil || !got.Equal(until) {
+		t.Fatal(got, e)
+	}
+	if e = s.FailJob(WithHostCooldown(ctx, "example.test", until.Add(time.Hour)), j.ID, "worker", "http_429", nil); !errors.Is(e, ErrLease) {
+		t.Fatal(e)
+	}
+	got, e = s.HostCooldown(ctx, "example.test")
+	if e != nil || !got.Equal(until) {
+		t.Fatal("lost lease extended cooldown", got, e)
+	}
+	if _, e = s.HostCooldown(ctx, "missing.test"); e != nil {
+		t.Fatal(e)
+	}
+	if e = st.Close(); e != nil {
+		t.Fatal(e)
+	}
+	st, e = store.Open(ctx, path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer st.Close()
+	s = New(st, func() time.Time { return clock })
+	got, e = s.HostCooldown(ctx, "Example.Test")
+	if e != nil || !got.Equal(until) {
+		t.Fatal("restart lost host cooldown", got, e)
+	}
+	clock = until.Add(time.Second)
+	j, e = s.ClaimJob(ctx, "next", time.Minute)
+	if e != nil {
+		t.Fatal(e)
+	}
+	shorter := until.Add(-time.Minute)
+	if e = s.FailJob(WithHostCooldown(ctx, "example.test", shorter), j.ID, "next", "http_429", nil); e != nil {
+		t.Fatal(e)
+	}
+	got, e = s.HostCooldown(ctx, "example.test")
+	if e != nil || !got.Equal(until) {
+		t.Fatal("shortened host cooldown", got, e)
+	}
+}
+func TestChangesDefaultPageMatchesContract(t *testing.T) {
+	ctx := context.Background()
+	s, _ := testService(t)
+	f := feedFixture(t, s)
+	entries := make([]FeedEntry, 55)
+	for i := range entries {
+		entries[i] = entryFixture(fmt.Sprintf("增量%d", i))
+	}
+	if _, e := s.IngestFeed(ctx, f.ID, entries); e != nil {
+		t.Fatal(e)
+	}
+	first, e := s.Changes(ctx, "0", 0)
+	if e != nil || len(first.Items) != 50 {
+		t.Fatal(len(first.Items), e)
+	}
+	second, e := s.Changes(ctx, first.NextCursor, 0)
+	if e != nil || len(second.Items) != 6 || second.Items[0].Seq == first.Items[49].Seq {
+		t.Fatal(len(second.Items), e)
+	}
+}
+
+func TestImportedRemovedIsArchivedWithoutBeingOrdinaryUnread(t *testing.T) {
+	ctx := context.Background()
+	s, _ := testService(t)
+	f := feedFixture(t, s)
+	article, e := s.ImportArticle(ctx, ImportArticleInput{SourceInstance: "synthetic", SourceID: "removed", FeedID: f.ID, Entry: entryFixture("旧系统removed"), Removed: true})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if !article.Hidden || !article.Removed || article.ReadAt != nil {
+		t.Fatal(article)
+	}
+	no := false
+	unread, e := s.ListArticles(ctx, ArticleQuery{Scope: "all", Read: &no})
+	if e != nil || len(unread.Items) != 0 {
+		t.Fatal("removed became unread", len(unread.Items), e)
+	}
+	archive, e := s.ListArticles(ctx, ArticleQuery{Scope: "archive"})
+	if e != nil || len(archive.Items) != 1 || archive.Items[0].ID != article.ID {
+		t.Fatal("removed lost from archive", len(archive.Items), e)
+	}
+}
+
+func TestConsecutiveNotModifiedResponsesRetainValidators(t *testing.T) {
+	ctx := context.Background()
+	s, _ := testService(t)
+	f := feedFixture(t, s)
+	for _, result := range []FeedResult{{ETag: `"synthetic-etag"`, LastModified: "Wed, 01 Jan 2025 00:00:00 GMT"}, {NotModified: true}, {NotModified: true}} {
+		j, e := s.QueueFeed(ctx, f.ID)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if _, e = s.ClaimJob(ctx, "worker", time.Minute); e != nil {
+			t.Fatal(e)
+		}
+		if e = s.CompleteFeedJob(ctx, j.ID, "worker", result); e != nil {
+			t.Fatal(e)
+		}
+		got, e := s.GetFeed(ctx, f.ID)
+		if e != nil || got.ETag != `"synthetic-etag"` || got.LastModified != "Wed, 01 Jan 2025 00:00:00 GMT" {
+			t.Fatal("304 lost validators", got.ETag, got.LastModified, e)
+		}
+	}
+}
+func TestFallbackIdentityRejectsTitleAloneAndSurvivesBodyChange(t *testing.T) {
+	ctx := context.Background()
+	s, _ := testService(t)
+	f := feedFixture(t, s)
+	for _, entry := range []FeedEntry{{Title: "仅相同标题", HTML: "<p>甲</p>"}, {Title: "仅相同标题", HTML: "<p>乙</p>"}, {Author: "只有作者"}} {
+		if _, e := s.IngestFeed(ctx, f.ID, []FeedEntry{entry}); !errors.Is(e, ErrInvalid) {
+			t.Fatalf("insufficient identity accepted: %+v %v", entry, e)
+		}
+	}
+	entry := FeedEntry{Title: "后备身份", Author: "合成作者", HTML: "<p>原始正文</p>"}
+	first, e := s.IngestFeed(ctx, f.ID, []FeedEntry{entry})
+	if e != nil {
+		t.Fatal(e)
+	}
+	entry.HTML = "<p>变化后的正文</p>"
+	again, e := s.IngestFeed(ctx, f.ID, []FeedEntry{entry})
+	if e != nil || first[0] != again[0] {
+		t.Fatal("body changed fallback identity", first, again, e)
+	}
+	article, e := s.GetArticle(ctx, first[0])
+	if e != nil || article.Provenance != "fallback" || article.Content[0].Text != "变化后的正文" {
+		t.Fatal(article, e)
+	}
+	var aliases int
+	if e = s.Store.Read.QueryRowContext(ctx, `SELECT count(*) FROM identities WHERE article_id=? AND kind='fallback'`, article.ID).Scan(&aliases); e != nil || aliases != 1 {
+		t.Fatal(aliases, e)
+	}
+}
+
+func TestMinifluxGUIDHashMatchesAfterURLChangeWithoutResettingState(t *testing.T) {
+	ctx := context.Background()
+	s, clock := testService(t)
+	f := feedFixture(t, s)
+	firstSeen := clock.AddDate(0, 0, -120)
+	readAt := firstSeen.AddDate(0, 0, 2)
+	guid := "stable-synthetic-guid"
+	original, e := s.ImportArticle(ctx, ImportArticleInput{SourceInstance: "synthetic-miniflux", SourceID: "legacy-1", FeedID: f.ID, OldHash: hash(guid), FirstSeenAt: &firstSeen, Read: true, ReadAt: &readAt, Favorite: true, Entry: FeedEntry{URL: "https://example.test/old-link", Title: "迁入文章", HTML: "<p>迁入正文</p>"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	importedAt, protection := *original.ImportedAt, *original.ProtectionUntil
+	*clock = clock.AddDate(0, 0, 4)
+	entry := FeedEntry{GUID: guid, URL: "https://example.test/changed-link", Title: "迁入文章更新", HTML: "<p>更新正文</p>"}
+	ids, e := s.IngestFeed(ctx, f.ID, []FeedEntry{entry})
+	if e != nil || len(ids) != 1 || ids[0] != original.ID {
+		t.Fatal("URL change duplicated legacy article", ids, e)
+	}
+	updated, e := s.GetArticle(ctx, original.ID)
+	if e != nil || updated.URL != entry.URL || updated.ReadAt == nil || !updated.ReadAt.Equal(readAt) || !updated.Favorite || !updated.FirstSeenAt.Equal(firstSeen) || !updated.ImportedAt.Equal(importedAt) || !updated.ProtectionUntil.Equal(protection) {
+		t.Fatalf("legacy state changed: %+v %v", updated, e)
+	}
+	page, e := s.ListArticles(ctx, ArticleQuery{Scope: "all"})
+	if e != nil || len(page.Items) != 1 {
+		t.Fatal("duplicate legacy article", len(page.Items), e)
+	}
+	var aliases int
+	if e = s.Store.Read.QueryRowContext(ctx, `SELECT count(*) FROM identities WHERE article_id=? AND ((kind='guid' AND value=?) OR (kind='url' AND value=?))`, original.ID, guid, normalizeURL(entry.URL)).Scan(&aliases); e != nil || aliases != 2 {
+		t.Fatal("new local aliases missing", aliases, e)
+	}
+	native := addFixture(t, s, f, "原生文章")
+	if e = s.Store.Read.QueryRowContext(ctx, `SELECT count(*) FROM identities WHERE article_id=? AND kind='miniflux_hash'`, native.ID).Scan(&aliases); e != nil || aliases != 0 {
+		t.Fatal("fabricated legacy alias on native article", aliases, e)
+	}
+}
+func TestMinifluxGUIDHashLookupIsFeedScopedAndConflictsAtomically(t *testing.T) {
+	ctx := context.Background()
+	s, _ := testService(t)
+	f := feedFixture(t, s)
+	guid := "synthetic-conflict-guid"
+	legacy, e := s.ImportArticle(ctx, ImportArticleInput{SourceInstance: "synthetic", SourceID: "one", FeedID: f.ID, OldHash: hash(guid), Entry: FeedEntry{URL: "https://example.test/legacy", Title: "旧记录", HTML: "<p>旧正文</p>"}})
+	if e != nil {
+		t.Fatal(e)
+	}
+	other := addFixture(t, s, f, "URL另有所属")
+	entry := FeedEntry{GUID: guid, URL: other.URL, Title: "冲突更新", HTML: "<p>不可写入</p>"}
+	if _, e = s.IngestFeed(ctx, f.ID, []FeedEntry{entry}); !errors.Is(e, ErrConflict) {
+		t.Fatal("legacy/local identity conflict accepted", e)
+	}
+	unchanged, e := s.GetArticle(ctx, legacy.ID)
+	if e != nil || unchanged.Title != legacy.Title || unchanged.Version != legacy.Version {
+		t.Fatal("conflict partially updated legacy record", unchanged, e)
+	}
+	var count int
+	if e = s.Store.Read.QueryRowContext(ctx, `SELECT count(*) FROM identities WHERE kind='guid' AND value=?`, guid).Scan(&count); e != nil || count != 0 {
+		t.Fatal("conflict left a local alias", count, e)
+	}
+	another, e := s.CreateFeed(ctx, Feed{URL: "https://another.test/feed", Title: "另一个源"})
+	if e != nil {
+		t.Fatal(e)
+	}
+	entry.URL = "https://another.test/article"
+	ids, e := s.IngestFeed(ctx, another.ID, []FeedEntry{entry})
+	if e != nil || ids[0] == legacy.ID {
+		t.Fatal("cross-feed legacy merge", ids, e)
 	}
 }

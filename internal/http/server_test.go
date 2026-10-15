@@ -13,6 +13,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	"shiliu-rss/api"
 	"shiliu-rss/internal/app"
 	"shiliu-rss/internal/store"
 )
@@ -203,5 +204,39 @@ func TestExpiredContentNeverLeavesHTTP(t *testing.T) {
 	code, _, body = call(t, srv, "GET", "/api/v1/articles?scope=all&q=uniquebodysecret", nil, cookie, "", "")
 	if code != 200 || !strings.Contains(string(body), `"items":[]`) {
 		t.Fatal(code, string(body))
+	}
+}
+
+func TestRevokedSessionCannotCreateTokenAfterAuthentication(t *testing.T) {
+	s, srv := testServer(t)
+	cookie, _ := login(t, srv)
+	req, _ := http.NewRequest("GET", srv.URL, nil)
+	req.Header.Set("Cookie", cookie)
+	p, e := s.authenticate(req)
+	if e != nil {
+		t.Fatal(e)
+	}
+	if _, e = s.App.Store.Write.Exec(`DELETE FROM sessions WHERE hash=?`, p.Hash); e != nil {
+		t.Fatal(e)
+	}
+	ctx := context.WithValue(context.Background(), principalKey{}, p)
+	_, e = s.CreateToken(ctx, api.CreateTokenRequestObject{Body: &api.TokenInput{Name: "must not exist", Scopes: []string{"articles:read"}}})
+	if e != unauthorized {
+		t.Fatalf("revocation race: %v", e)
+	}
+	var n int
+	if e = s.App.Store.Read.QueryRow(`SELECT count(*) FROM tokens`).Scan(&n); e != nil || n != 0 {
+		t.Fatal("token created after logout", n, e)
+	}
+}
+
+func TestExplicitZeroLimitViolatesContract(t *testing.T) {
+	_, srv := testServer(t)
+	cookie, _ := login(t, srv)
+	for _, path := range []string{"/api/v1/articles?limit=0", "/api/v1/changes?limit=0", "/api/v1/articles?limit=201", "/api/v1/changes?limit=-1"} {
+		code, _, _ := call(t, srv, "GET", path, nil, cookie, "", "")
+		if code != 400 {
+			t.Fatalf("%s: %d", path, code)
+		}
 	}
 }

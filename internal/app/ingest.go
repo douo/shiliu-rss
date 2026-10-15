@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"strings"
 )
 
 type identity struct{ kind, value string }
 
-func entryIdentities(e FeedEntry) []identity {
+func entryIdentities(e FeedEntry) ([]identity, error) {
 	out := []identity{}
 	if e.GUID != "" {
 		out = append(out, identity{"guid", e.GUID})
@@ -30,24 +31,35 @@ func entryIdentities(e FeedEntry) []identity {
 		}
 	}
 	if len(out) == 0 {
+		if strings.TrimSpace(e.Title) == "" || (strings.TrimSpace(e.Author) == "" && (e.PublishedAt == nil || e.PublishedAt.IsZero())) {
+			return nil, ErrInvalid
+		}
 		p := ""
 		if e.PublishedAt != nil {
 			p = stamp(*e.PublishedAt)
 		}
 		out = append(out, identity{"fallback", hash(e.Title + "|" + e.Author + "|" + p)})
 	}
-	return out
+	return out, nil
 }
 func (s *Service) upsertEntry(ctx context.Context, tx *sql.Tx, feedID string, e FeedEntry, imp *ImportArticleInput) (string, error) {
-	if len(e.HTML) > 8<<20 || len(e.Text) > 8<<20 {
-		return "", ErrInvalid
+	identities, identityErr := entryIdentities(e)
+	if identityErr != nil {
+		return "", identityErr
 	}
-	if e.HTML != "" {
-		e.HTML, e.Text = CleanContent(e.HTML)
+	// Miniflux 2.3.0 persisted SHA256(GUID/JSON Feed ID), rather than
+	// the raw identifier. Match existing import aliases so a changed URL does
+	// not create a second article. These are lookup candidates only: native
+	// articles never gain a fabricated legacy identity.
+	candidates := identities
+	if imp == nil && strings.TrimSpace(e.GUID) != "" {
+		candidates = append(append([]identity(nil), identities...), identity{"miniflux_hash", hash(e.GUID)})
+		if trimmed := strings.TrimSpace(e.GUID); trimmed != e.GUID {
+			candidates = append(candidates, identity{"miniflux_hash", hash(trimmed)})
+		}
 	}
-	identities := entryIdentities(e)
 	articleID := ""
-	for _, v := range identities {
+	for _, v := range candidates {
 		var match string
 		err := tx.QueryRowContext(ctx, `SELECT article_id FROM identities WHERE feed_id=? AND kind=? AND value=?`, feedID, v.kind, v.value).Scan(&match)
 		if err == nil {
@@ -65,6 +77,9 @@ func (s *Service) upsertEntry(ctx context.Context, tx *sql.Tx, feedID string, e 
 		seen := now
 		var imported, protection, read any
 		provenance := "feed"
+		if len(identities) == 1 && identities[0].kind == "fallback" {
+			provenance = "fallback"
+		}
 		favorite, removed, unknown := false, false, false
 		tags := "[]"
 		if imp != nil {
@@ -245,6 +260,11 @@ func (s *Service) ImportFeed(ctx context.Context, instance, sourceID string, f F
 	return s.GetFeed(ctx, target)
 }
 func (s *Service) ImportArticle(ctx context.Context, input ImportArticleInput) (Article, error) {
+	prepared, err := prepareEntry(input.Entry)
+	if err != nil {
+		return Article{}, err
+	}
+	input.Entry = prepared
 	var target string
 	e := s.write(ctx, func(tx *sql.Tx) error {
 		e := tx.QueryRowContext(ctx, `SELECT target_id FROM imports WHERE source_instance=? AND entity_type='article' AND source_id=?`, input.SourceInstance, input.SourceID).Scan(&target)
@@ -284,6 +304,11 @@ func (s *Service) ImportArticle(ctx context.Context, input ImportArticleInput) (
 // IngestFeed is useful for controlled imports and integration fixtures; normal
 // polling completes through CompleteFeedJob for atomic lease/result semantics.
 func (s *Service) IngestFeed(ctx context.Context, feedID string, entries []FeedEntry) ([]string, error) {
+	prepared, err := prepareEntries(entries)
+	if err != nil {
+		return nil, err
+	}
+	entries = prepared
 	out := []string{}
 	e := s.write(ctx, func(tx *sql.Tx) error {
 		for _, entry := range entries {

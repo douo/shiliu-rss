@@ -4,7 +4,9 @@ cd "$(dirname "$0")/.."
 set -a
 . ./config/dev.env
 set +a
-go run ./cmd/reader serve &
+mkdir -p .local
+go build -o .local/reader-dev ./cmd/reader
+.local/reader-dev serve &
 api_pid=$!
 pnpm --dir web dev &
 web_pid=$!

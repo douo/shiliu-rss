@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
 	"shiliu-rss/migrations"
 )
@@ -44,11 +43,7 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return closeErr(err)
 	}
 	migrationMu.Lock()
-	goose.SetBaseFS(migrations.Files)
-	err = goose.SetDialect("sqlite3")
-	if err == nil {
-		err = goose.UpContext(ctx, w, ".")
-	}
+	err = migrate(ctx, w, absolute, migrations.Files)
 	migrationMu.Unlock()
 	if err != nil {
 		return closeErr(fmt.Errorf("migrate: %w", err))

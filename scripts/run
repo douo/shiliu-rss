@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+cd "$(dirname "$0")/.."
+set -a
+. ./config/dev.env
+set +a
+export SHILIU_ORIGIN="http://$SHILIU_ADDR"
+exec ./dist/reader serve

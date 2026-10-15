@@ -99,6 +99,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "getSession",
@@ -189,6 +199,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -289,6 +309,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -405,6 +435,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "listCategories",
@@ -502,6 +542,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -625,6 +675,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "updateCategory",
@@ -735,6 +795,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -871,6 +941,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "listFeeds",
@@ -968,6 +1048,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1091,6 +1181,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "updateFeed",
@@ -1201,6 +1301,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1334,6 +1444,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "refreshFeed",
@@ -1453,6 +1573,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1660,6 +1790,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "getArticle",
@@ -1767,6 +1907,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1893,6 +2043,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "Atomically set read state for up to 200 explicit article IDs.",
@@ -2002,6 +2162,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2128,6 +2298,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2271,6 +2451,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "getJob",
@@ -2380,6 +2570,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2517,6 +2717,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "listTokens",
@@ -2614,6 +2824,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2723,6 +2943,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2846,6 +3076,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "Owner only; count content that would be purged now using an optional proposed feed policy. Does not mutate data.",
@@ -2962,6 +3202,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "getHealth",
@@ -3061,6 +3311,16 @@
           },
           "500": {
             "description": "Internal error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3172,6 +3432,16 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Request timeout or unavailable",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "description": "importOPML",
@@ -3228,6 +3498,16 @@
           "code",
           "request_id",
           "retryable"
+        ],
+        "examples": [
+          {
+            "type": "urn:shiliu:error:version_mismatch",
+            "title": "Precondition Failed",
+            "status": 412,
+            "code": "version_mismatch",
+            "request_id": "synthetic-request-id",
+            "retryable": false
+          }
         ]
       },
       "Session": {
@@ -3243,6 +3523,12 @@
         "required": [
           "authenticated",
           "csrf_token"
+        ],
+        "examples": [
+          {
+            "authenticated": true,
+            "csrf_token": "synthetic-csrf-placeholder"
+          }
         ]
       },
       "Login": {
@@ -3406,6 +3692,16 @@
         "required": [
           "url",
           "title"
+        ],
+        "examples": [
+          {
+            "url": "https://example.org/feed.xml",
+            "title": "示例订阅",
+            "archive": false,
+            "interval_hours": 5,
+            "read_days": 7,
+            "unread_days": 30
+          }
         ]
       },
       "Content": {
@@ -3650,6 +3946,12 @@
         },
         "required": [
           "version"
+        ],
+        "examples": [
+          {
+            "version": 3,
+            "favorite": true
+          }
         ]
       },
       "ArticlePage": {
@@ -3713,6 +4015,14 @@
           "kind",
           "content",
           "basis_hash"
+        ],
+        "examples": [
+          {
+            "external_id": "article-42-summary-v1",
+            "kind": "summary",
+            "content": "这是整理后的摘要。",
+            "basis_hash": "use-content_hash-from-getArticle"
+          }
         ]
       },
       "Job": {
@@ -3876,6 +4186,15 @@
         "required": [
           "name",
           "scopes"
+        ],
+        "examples": [
+          {
+            "name": "摘要助手",
+            "scopes": [
+              "articles:read",
+              "artifacts:write"
+            ]
+          }
         ]
       },
       "TokenCreated": {

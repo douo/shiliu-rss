@@ -2,6 +2,7 @@ name: shiliu-rss
 services:
   reader:
     image: ${SHILIU_IMAGE:?Set the locally built and verified immutable release image}
+    pull_policy: never
     platform: linux/amd64
     restart: unless-stopped
     read_only: true

@@ -33,6 +33,22 @@
     categoryTitle = $state('');
   let preview = $state<{ articles: number; contents: number; bytes: number } | null>(null),
     health = $state<Record<string, unknown> | null>(null);
+  let previewSignature = '';
+  $effect(() => {
+    const signature = JSON.stringify(editing);
+    if (signature !== previewSignature) {
+      preview = null;
+      previewSignature = signature;
+    }
+  });
+  const original = $derived(feeds.find((feed) => feed.id === editing?.id));
+  const policyChanged = $derived(
+    !!original &&
+      !!editing &&
+      (original.archive !== editing.archive ||
+        original.read_days !== editing.read_days ||
+        original.unread_days !== editing.unread_days)
+  );
   const permissions = [
     ['articles:read', '读取文章与归档'],
     ['reading:write', '更改已读、收藏与笔记'],
@@ -349,6 +365,11 @@
             普通源正文保留 90
             天。收藏与长期存档豁免正文清理；长期存档仍按可见期限归档，不会自动获取全文。
           </p>
+          {#if policyChanged}<p class="notice">
+              保存后会立即按新可见期限显示或归档文章。{original?.archive && !editing.archive
+                ? '切回普通保存后，超过90天且没有收藏/迁入保护的正文可能立即不可读；已清理正文不会自动恢复。'
+                : ''}笔记、标签和 Agent 摘要继续保留。可先预览正文清理范围。
+            </p>{/if}
           <div class="button-row">
             {#if editing.id}<button
                 type="button"
