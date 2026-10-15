@@ -1,23 +1,70 @@
 # 拾流 RSS · Shiliu
 
-为开发者本人设计的自托管 RSS 阅读器，运行于现有 NAS。以简洁阅读、可靠自动更新、按源保存和 Agent 接入为核心。项目标识为 `shiliu-rss`，本机目录为 `<checkout>`。
+一个自托管的个人 RSS 阅读器：可靠后台更新，清爽阅读，按源保存，正式 Agent API。Go + SQLite 单进程，Svelte 5 / TypeScript / SvelteKit 静态前端，Tailwind CSS 4。图标使用 [抽象石榴 SVG](assets/icon.svg)。
 
-**当前阶段：首版产品基线 v1.0 及本轮 UI 增补已明确，技术选型已完成（2026-10-15）。** 采用 Go + SQLite，前端为 Svelte 5 + TypeScript + SvelteKit 静态构建 + Tailwind CSS 4。NAS 单进程提供静态页面、Agent API 和可靠后台调度。已完成本地 SQLite 搜索实验及 Linux AMD64 交叉编译验证；尚未实现应用或替换 Miniflux。
+**首版已实现并完成本机验证（2026-10-15）。** NAS 部署、真实数据迁移和 Miniflux 切换未执行。已实现的功能及验证边界见 [实施验收记录](docs/implementation.md)。
 
-图标采用用户指定的**抽象、简化石榴**：顶部冠形、圆润果体和五粒留白籽，单色石榴红、透明背景。源文件为 [icon.svg](assets/icon.svg)，用于后续网页图标和应用标识；缩小时优先保持轮廓清晰，不叠加文字或复杂装饰。
+## 本机启动
 
-| 文档 | 用途 |
+需要 Go 自动工具链、pnpm 11.0.9；项目固定 Go 1.27.2、Node 24.22.0，pnpm 自动下载项目 Node，不更改全局 Node。首次准备：
+
+```sh
+make setup
+make init
+make dev
+```
+
+打开 **http://127.0.0.1:41002**。初始随机密码在本机 `.local/admin-password`，只有本机用户可读；登录无用户名。`make init` 仅在首次初始化时执行，不覆盖已有账号。本次已完成本机初始化，可以直接 `make dev`。
+
+API `41001`、Vite `41002` 是本机 APR 分配的固定端口，固化在 [config/dev.env](config/dev.env)，启动不再调用 ensure。开发库位于 `.local/reader.db`，所有私人内容、密码、数据库和备份都被 Git 忽略。源正文由后台抓取，普通公网源无需开放内网访问；测试或明确的内网源需在源设置填写允许的具体主机。
+
+运行嵌入静态前端的单进程成品（与 dev 二选一）：
+
+```sh
+make run
+```
+
+打开 **http://127.0.0.1:41001**。本机 HTTP 使用非 Secure cookie；部署 HTTPS 必须设 `SHILIU_COOKIE_SECURE=true` 和准确的 `SHILIU_ORIGIN`，不信任任意转发头。
+
+## 已实现
+
+- RSS / Atom / JSON Feed、分类、OPML、源设置与健康；默认 5 小时 ±1 小时自动检查，条件请求、退避、持久任务/租约、重启恢复与同站限流。
+- 近期/未读/收藏/归档、中文及英文搜索、手机布局、键盘操作、笔记/标签/Agent 摘要。新内容提示后主动更新列表，保留阅读位置。
+- 隐藏与清正文分开；普通源 90 天、收藏及长期源豁免、迁入正文 30 天保护；清理同时处理衍生文本和索引，普通轮询不会填回已清正文。
+- 仅显式全文获取；失败保留已有内容。HTML 净化、出站地址检查、体积/并发限制、严格脚本 CSP、gzip 静态资源。
+- 本人密码/会话、独立可撤销 scoped token、稳定分页、增量 changes、事务幂等、版本与内容依据冲突检查。
+- Miniflux 2.3.0 一致快照导出、预览/对账/可重试导入；一致备份/恢复、升级前备份、Linux AMD64 成品与部署模板。
+
+## 可重复验证
+
+```sh
+make check-generated  # OpenAPI → Go/TS 生成漂移
+make check            # go vet + Svelte/TypeScript
+make test             # Go race / SQLite / 抓取 / API / 调度 / 导入恢复
+make test-web         # 先停 dev/run；隔离临时库启动 Go 静态成品，18 项浏览器验收
+make build-linux      # 本机静态交叉编译 Linux AMD64 v1
+```
+
+PostgreSQL 一致快照测试使用本机临时 Unix socket；本机已有 PostgreSQL 18.6 CLI。没有相应工具时该单项明确 skip，不能当作完整迁移验收。详见 [操作说明](docs/operations.md)。
+
+完整合成规模及维护演练：
+
+```sh
+go run ./cmd/bench-reader -maintenance -output /tmp/shiliu-scale.json
+```
+
+使用 200 个源、10 万文章、2 万正文（约 500 MiB HTML），临时库结束自动删除。已记录的本机结果见 [scale.json](docs/validation/scale.json)：列表 p95 0.657 ms、中文搜索 p95 31.8 ms，备份 10.09 秒、恢复 14.57 秒。它们是本机合成场景结果，**不是 NAS 性能、混合负载峰值内存或功耗结果**。
+
+## 文档与部署边界
+
+| 文档 | 内容 |
 |---|---|
-| [产品模块与需求](docs/product.md) | 首版功能、阅读流程、数据生命周期、Agent 能力和验收标准 |
-| [技术选型](docs/technology.md) | Go/Rust 比较、选定组件、中文搜索、验证证据和待实测预算 |
-| [架构设计](docs/architecture.md) | 模块边界、调度恢复、数据生命周期、API、迁移和运行维护 |
-| [决策与待确认项](docs/decisions.md) | 用户已确认要求、工程选择、已撤回方案与实施待办 |
-| [开源产品参考](docs/research.md) | Miniflux、FreshRSS、Stringer 的可借鉴设计和 NAS 实际约束 |
-| [SQLite 搜索实验](spikes/sqlite-search/README.md) | 可重现的独立验证；不是应用脚手架 |
-| [AGENTS.md](AGENTS.md) | 面向 Agent 的项目协作与开发约定 |
+| [产品需求](docs/product.md) | R-01–R-18、A01–A10、首版范围 |
+| [实施验收](docs/implementation.md) | 完成状态、实际检查、未验证事项 |
+| [技术选型](docs/technology.md) / [架构](docs/architecture.md) | 约束、版本、模块与不变量 |
+| [决策记录](docs/decisions.md) | 用户决定与实现中的兼容修订 |
+| [OpenAPI](api/openapi.yaml) / [Agent 接入](docs/agent-api.md) | 共享契约、scope、分页与幂等 |
+| [操作说明](docs/operations.md) | 导入、备份恢复、Linux 检查、部署准备 |
+| [前端说明](web/README.md) | 构建、键盘/手机交互、浏览器验证 |
 
-本项目独立于 [NAS 维护项目](docs/production.md)。NAS 项目负责机器与部署台账；这里负责阅读器产品及未来代码。**开发、测试、构建都在本机；NAS 只部署成品。** 本机开发端口使用本机 APR；NAS 没有 APR，部署端口按实际占用检查及 NAS 台账管理，不需要为本项目安装 APR。
-
-下一阶段从数据模型、API 契约及后台抓取/清理的纵向实现开始。根目录目前没有应用启动命令；实验命令见其 README。NAS 内存、CPU、功耗与恢复目标仍需实际应用验证。
-
-更新日期：2026-10-15。
+开发、测试、构建和恢复演练全部在本机。NAS 仅接收发布产物；部署时再核对实际占用、配置端口并登记 NAS 台账，不在 NAS 安装 APR。Miniflux 保持现状。真实实例 schema、特殊源配置及最终迁移窗口需要在后续授权操作中核实。

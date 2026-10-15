@@ -1,6 +1,6 @@
 # 技术选型
 
-日期：2026-10-15。状态：**本轮工程选型已完成，尚未实现应用或部署。** 产品依据为 [v1.0 基线](product.md)。用户要求继续技术选型，并明确语言无偏好，以长期维护和低资源占用为准；下列具体组合由 Agent 据此选定，不冒称用户逐项确认过依赖。
+日期：2026-10-15。状态：**首版已实现并完成本机验证；NAS 尚未部署。** 产品依据为 [v1.0 基线](product.md)。用户要求继续技术选型，并明确语言无偏好，以长期维护和低资源占用为准；下列具体组合由 Agent 据此选定，不冒称用户逐项确认过依赖。
 
 ## 结论
 
@@ -16,10 +16,10 @@
 | 样式与组件 | Tailwind CSS 4，按需 shadcn-svelte，Lucide SVG 图标 | 统一主题/间距/排版，复用菜单与弹窗的交互基础；不整套搬入后台模板 |
 | API | HTTP JSON、OpenAPI 3.1.0；`oapi-codegen` + `openapi-typescript` / `openapi-fetch` | 同一契约生成 Go 处理器类型与前端调用类型；浏览器和 Agent 使用同一 API |
 | 源解析 | `mmcdole/gofeed` | RSS、Atom、JSON Feed 统一模型；只解析应用已受控取得的字节 |
-| 显式全文 | `go-shiori/go-readability` + `microcosm-cc/bluemonday` | 对已经下载的 HTML 提取正文并净化；不启用浏览器或主动补抓 |
+| 显式全文 | `codeberg.org/readeck/go-readability/v2` + `microcosm-cc/bluemonday` | 对已经下载的 HTML 提取正文并净化；不启用浏览器或主动补抓 |
 | 调度 | 进程内定时器 + SQLite 持久任务/租约 | 工作可恢复，空闲不忙等；不用外部 cron 承担核心调度 |
 | 运行 | 单个 Docker 容器、现有 nginx、LAN/VPN | 复用 NAS 运维方式；应用数据独立，不依赖 Miniflux PostgreSQL |
-| 验证 | Go 测试、真实 SQLite 集成测试、svelte-check、Vitest、Playwright | 优先验证 A01–A10；全部在本机，NAS 部署后做健康确认和正常负载观察 |
+| 验证 | Go 测试、真实 SQLite/PostgreSQL 集成测试、svelte-check、Playwright | 优先验证 A01–A10；全部在本机，NAS 部署后做健康确认和正常负载观察 |
 
 ## 为什么选 Go，Rust 怎么样
 
@@ -81,15 +81,15 @@ FTS5 使用 `content=''` 和 `contentless_delete=1`，不另存一份完整可�
 |---|---|---|
 | Go | 官方当前稳定补丁 1.27.2；本机原有 1.26.4 | 实验使用自动下载的 1.27.2；未更改全局 Homebrew 安装。开发基线 1.27.2 |
 | modernc SQLite | `go list -m ...@latest` 得到 v1.60.1；实际运行 SQLite 3.53.4 | 已锁在实验 go.mod/go.sum；保留其要求的 libc v1.77.1，不独立漂移升级 |
-| oapi-codegen | 查询得到 v2.8.0；发布说明已支持 OpenAPI 3.1 | 首次实现固定该版本；本轮未生成产品接口。严格类型不等于自动完成权限、业务或全部 schema 校验 |
-| 前端版本候选 | Svelte 5.57.2、SvelteKit 3.1.0、adapter-static 4.0.0、Vite 8.3.4、vite-plugin-svelte 7.3.1、TypeScript 6.0.3 | npm 版本及主要 peer 范围已核对；Kit 要求 TS ^6，不使用查询到的最新 TS 7.0.2。尚未做完整组件组合构建 |
-| Tailwind | tailwindcss 与 @tailwindcss/vite 当前同为 4.3.3 | 首次实现使用兼容配套版本，Typography 与按需组件一并验证并锁定 |
+| oapi-codegen | 查询得到 v2.8.0；发布说明已支持 OpenAPI 3.1 | 已固定该版本，生成产品接口并检查漂移。严格类型不等于自动完成权限、业务或全部 schema 校验 |
+| 前端版本候选 | Svelte 5.57.2、SvelteKit 3.1.0、adapter-static 4.0.0、Vite 8.3.4、vite-plugin-svelte 7.3.1、TypeScript 6.0.3 | npm 版本及主要 peer 范围已核对；Kit 要求 TS ^6，不使用查询到的最新 TS 7.0.2。已完成完整静态构建、类型检查和浏览器验证 |
+| Tailwind | tailwindcss 与 @tailwindcss/vite 当前同为 4.3.3 | 已在产品锁文件固定配套版本，Typography 组合构建通过 |
 | 中文搜索与清理 | 本机实际驱动测试通过 | 覆盖两字/单字、中英混排、顺序、字面查询转义、正文清理、保留整理成果、事务回滚 |
 | 目标平台 | Linux/AMD64、`GOAMD64=v1`、`CGO_ENABLED=0` 交叉编译验证 | 仅验证实验构建兼容性；不代表已经在 NAS 运行，也不是功耗测试 |
 
 可重现证据见 [SQLite 搜索实验](../spikes/sqlite-search/README.md)。Go 版本依据 [官方发布记录](https://go.dev/doc/devel/release)，驱动依据 [modernc 文档](https://pkg.go.dev/modernc.org/sqlite)，API 工具依据 [v2.8.0 发布说明](https://github.com/oapi-codegen/oapi-codegen/releases/tag/v2.8.0)。
 
-其余已选择的库在首次应用实现时核对兼容补丁并固定到应用的 go.mod/go.sum、pnpm-lock.yaml；目前没有根模块或前端应用，不能把实验依赖当成产品依赖已经全部锁好。前端采用本机 Node 24 LTS + pnpm，具体补丁与 packageManager 固定在项目配置；不静默替换本机已有 Node 26。生成器、构建基础镜像及最终镜像也要固定版本或 digest，升级通过测试，不使用浮动 `latest` 部署。
+应用依赖已固定在根 go.mod/go.sum 与 web/pnpm-lock.yaml；Go 1.27.2、Node 24.22.0、pnpm 11.0.9。pnpm 项目 runtime 实际运行 Node24，不更改全局Node26；入口可能显示全局 engines 警告，脚本实际版本已验证。生成器固定，运行镜像固定AMD64 digest，详见 deploy/Dockerfile；不使用浮动 latest 部署。
 
 实现资料：[gofeed](https://github.com/mmcdole/gofeed)、[go-readability](https://github.com/go-shiori/go-readability)、[bluemonday](https://github.com/microcosm-cc/bluemonday)、[goose](https://github.com/pressly/goose)、[OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0.html)。
 
@@ -110,4 +110,14 @@ FTS5 使用 `content=''` 和 `contentless_delete=1`，不另存一份完整可�
 
 不达标先分析请求量、缓冲复制、索引、锁等待与 SQLite 驱动；若仍无法达到资源预算，再决定驱动或语言调整。不能仅用 hello-world 内存或合成搜索耗时证明整套阅读器的性能。
 
-下一阶段顺序：① 本机工具链、数据模型与 API 契约；② 调度、去重、搜索、清理的纵向实现；③ 现代简洁阅读界面与 Agent 写回；④ 本机 Miniflux 导入/恢复演练与 Linux 成品验证；⑤ 后续部署时确认健康及实际资源使用。模块和运行约束见 [架构设计](architecture.md)。
+上述本机实现阶段已完成，实际结果见 [实施验收](implementation.md)。下一步仅在后续授权下核对真实Miniflux配置、执行独立迁移和NAS部署；部署后确认健康及正常运行资源。模块和运行约束见 [架构设计](architecture.md)。
+
+## 实现阶段兼容修订
+
+- `go-shiori/go-readability` 的 go.mod 官方标记 deprecated 并指向 `codeberg.org/readeck/go-readability/v2`；采用官方继任 v2.1.3，继续只调用 FromReader，网络仍由受控 fetch 层负责。实际RSS/全文合成测试通过。
+- Lucide 官方包由 `lucide-svelte` 迁为 `@lucide/svelte`，固定1.57.0；视觉体系未变。
+- SvelteKit3已移除旧 svelte.config.js 配置入口，按实际API在 vite.config.ts 的 sveltekit 配置 adapter/preprocess。静态fallback为200.html，构建后解析HTML将启动脚本外置以满足 script-src self，再生成gzip侧文件；Go提供正确MIME/编码/缓存。
+- openapi-typescript7.13.0声明TS5 peer，而选定Kit3要求TS6。实际生成、TS6严格检查和浏览器均通过，在pnpm精确记录兼容例外；Typography/Tailwind4同样记录pnpm误报范围的精确例外。
+- goose固定v3.27.0与pgx v5.8.0组成兼容组合；modernc保持v1.60.1/libc v1.77.1。所有版本见锁文件。
+- 复杂前端状态通过Playwright验证，无独立纯逻辑模块需要Vitest，未为相同交互重复建测试框架。
+- 宽泛中文FTS原查询在10万文章数据上约1秒；有界候选探测区分宽查询与稀疏查询，保留到期字段过滤及字面AND语义，复测p95约32ms。结果仅适用于本机合成负载。

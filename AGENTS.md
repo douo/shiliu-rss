@@ -2,14 +2,14 @@
 
 项目标识 `shiliu-rss`，工作目录 `<checkout>`。用户已指定图标为抽象、简化的石榴，使用 [SVG 源文件](assets/icon.svg)；保留 RSS 用途标记，不另起名称或改用无关图案。
 
-先读 [产品需求](docs/product.md)、[技术选型](docs/technology.md)、[架构设计](docs/architecture.md) 和 [决策记录](docs/decisions.md)。产品基线 v1.0 及 R-18 的 UI 增补已明确；工程选择为 Go + SQLite，前端 Svelte 5 + TypeScript + SvelteKit 静态构建 + Tailwind CSS 4，按需使用 shadcn-svelte。当前只有文档及独立验证实验，没有应用脚手架；不要把实验通过、设计预算或计划中的命令写成产品功能已实现。
+先读 [产品需求](docs/product.md)、[技术选型](docs/technology.md)、[架构设计](docs/architecture.md) 和 [决策记录](docs/decisions.md)。产品基线 v1.0 及 R-18 的 UI 增补已明确；工程选择为 Go + SQLite，前端 Svelte 5 + TypeScript + SvelteKit 静态构建 + Tailwind CSS 4，按需使用 shadcn-svelte。首版应用及本机验证已落地，状态见 docs/implementation.md；独立实验、设计预算和未运行的检查仍不能写成产品验证结果。
 
 ## Agent first
 
 - 产品需求使用稳定的 `R-` 编号，区分已确认要求、设计提案和待定项。用户的新回答优先于旧提案；修改相应正文，并在决策记录保留必要的变更原因。
 - 后续实现从具体需求和可观察的验收场景开始。每个任务说明目标、涉及模块、验收方法和未处理项，避免只留下聊天上下文。
 - 核心能力提供文档化 API；网页和 Agent 共享业务规则。Agent 不通过直写数据库绕开保存策略、幂等性和访问权限。
-- 应用实现阶段建立可重复的启动、迁移、测试入口；版本锁定、示例配置和契约随代码维护。根目录尚无这些命令，只有 `spikes/sqlite-search` 的实验测试入口。
+- 应用实现阶段建立可重复的启动、迁移、测试入口；版本锁定、示例配置和契约随代码维护。根目录 Makefile/scripts 提供启动、迁移、测试、生成漂移与构建入口；`spikes/sqlite-search` 仍为独立实验。
 - 优先验证容易出错的行为：后台失败后恢复、重复抓取去重、重启后续作、到期隐藏与正文清理、收藏豁免、迁移一致性、Agent 重复请求。普通文案修改无需额外测试框架。
 - 方案保持模块职责清晰；首版不因未来扩展假想引入多租户、微服务、复杂插件系统或模型运行平台。变更已选技术需记录实际理由和影响；不因 Agent 偏好另起技术栈。
 - 使用显式参数化 SQL 和短事务，网络/解析不占写事务。业务数据、FTS 索引、变更记录和任务结果需一致提交；SQLite 每个连接的必要 PRAGMA 都要生效。
@@ -24,4 +24,4 @@
 - 部署目标是 SSH 别名 `nas`。需要实际操作时读取 NAS 项目的 [操作约定](docs/production.md) 和相关服务技能。
 - NAS 不留开发环境、一次性脚本、任务日志或无用中间文件；服务必需的数据与受控运行日志另按正常运维处理。
 - Miniflux 保持现状。技术选型不包含部署、实际数据迁移或下线旧服务；后续实施时先完成独立导入与核验，再进行用户要求的切换。
-- 本机开发服务首次配置时使用本机 APR 分配并固化端口，不在每次启动时 ensure。NAS 没有 APR；按本次用户明确的环境边界，NAS 部署端口检查实际占用后配置并写入 NAS 台账，不套用本机 APR 分配、不在 NAS 安装 APR。当前文档及无 HTTP 的 SQLite 实验不占用端口或修改 nginx。
+- 本机开发服务首次配置时使用本机 APR 分配并固化端口，不在每次启动时 ensure。NAS 没有 APR；按本次用户明确的环境边界，NAS 部署端口检查实际占用后配置并写入 NAS 台账，不套用本机 APR 分配、不在 NAS 安装 APR。本机 API41001/Vite41002 已由 APR 分配并固化 config/dev.env；尚未修改 NAS nginx。

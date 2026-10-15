@@ -1,0 +1,65 @@
+{
+  "at": "2026-10-15T07:44:38.035055Z",
+  "host": "darwin/arm64",
+  "go": "go1.27.2",
+  "feeds": 200,
+  "articles": 100000,
+  "bodies": 20000,
+  "source_html_bytes": 524700000,
+  "db_bytes": 1228455936,
+  "index_bytes": 111497216,
+  "seed_seconds": 23.016200125,
+  "rss_bytes": 73908224,
+  "heap_bytes": 2825040,
+  "queries": {
+    "chinese_music": {
+      "samples": 30,
+      "p50_ms": 31.357,
+      "p95_ms": 31.8,
+      "max_ms": 31.931
+    },
+    "english_sqlite": {
+      "samples": 30,
+      "p50_ms": 20.32,
+      "p95_ms": 20.678,
+      "max_ms": 20.751
+    },
+    "list_50": {
+      "samples": 30,
+      "p50_ms": 0.491,
+      "p95_ms": 0.657,
+      "max_ms": 0.717
+    },
+    "single_han": {
+      "samples": 30,
+      "p50_ms": 19.1,
+      "p95_ms": 19.472,
+      "max_ms": 20.048
+    },
+    "sparse_title": {
+      "samples": 30,
+      "p50_ms": 0.221,
+      "p95_ms": 0.228,
+      "max_ms": 0.236
+    }
+  },
+  "notes": [
+    "Synthetic local workload; does not establish NAS/J1900 latency, power, or memory budgets.",
+    "Reported RSS is a post-seed process snapshot; it is not mixed-workload peak memory.",
+    "HTML is sanitized and indexed through the application service; source HTML and derived text both occupy authoritative content storage.",
+    "Maintenance elapsed includes consistency/integrity validation and filesystem synchronization; restore performs lifecycle cleanup before publication. Fresh synthetic bodies remain within retention. Temporary source/backup/restored databases are removed after the run."
+  ],
+  "maintenance": {
+    "backup_seconds": 10.089800083,
+    "restore_seconds": 14.574077291,
+    "backup_bytes": 1221619712,
+    "restored_db_bytes": 1221619712,
+    "source_feeds": 200,
+    "source_articles": 100000,
+    "source_bodies": 20000,
+    "restored_feeds": 200,
+    "restored_articles": 100000,
+    "restored_bodies": 20000,
+    "integrity_passed": true
+  }
+}
