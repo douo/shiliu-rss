@@ -33,7 +33,7 @@ export interface paths {
         /** @description listCategories */
         get: operations["listCategories"];
         put?: never;
-        /** @description createCategory */
+        /** @description Create a category. Titles are trimmed and must contain 1–100 Unicode characters. Duplicate titles return 409. */
         post: operations["createCategory"];
         delete?: never;
         options?: never;
@@ -51,11 +51,11 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        /** @description deleteCategory */
+        /** @description Delete a category using its current version. Atomically move member feeds to uncategorized, increment their versions and emit change events. Preserve feeds, articles, bodies and reading state. Stale versions return 412. A later Miniflux reimport referencing the deleted category reports a conflict instead of recreating it. */
         delete: operations["deleteCategory"];
         options?: never;
         head?: never;
-        /** @description updateCategory */
+        /** @description Rename a category using its current version. Titles are trimmed and must contain 1–100 Unicode characters. Duplicate titles return 409; stale versions return 412. */
         patch: operations["updateCategory"];
         trace?: never;
     };
@@ -598,9 +598,11 @@ export interface components {
             imported: number;
         };
         CategoryInput: {
+            /** @description Trimmed category name, 1–100 Unicode characters; unique among current categories. */
             title: string;
         };
         CategoryPatch: {
+            /** @description Trimmed category name, 1–100 Unicode characters; unique among current categories. */
             title: string;
             /** Format: int64 */
             version: number;

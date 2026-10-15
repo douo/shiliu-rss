@@ -561,7 +561,7 @@
             }
           }
         },
-        "description": "createCategory",
+        "description": "Create a category. Titles are trimmed and must contain 1–100 Unicode characters. Duplicate titles return 409.",
         "security": [
           {
             "sessionCookie": []
@@ -687,7 +687,7 @@
             }
           }
         },
-        "description": "updateCategory",
+        "description": "Rename a category using its current version. Titles are trimmed and must contain 1–100 Unicode characters. Duplicate titles return 409; stale versions return 412.",
         "security": [
           {
             "sessionCookie": []
@@ -814,7 +814,7 @@
             }
           }
         },
-        "description": "deleteCategory",
+        "description": "Delete a category using its current version. Atomically move member feeds to uncategorized, increment their versions and emit change events. Preserve feeds, articles, bodies and reading state. Stale versions return 412. A later Miniflux reimport referencing the deleted category reports a conflict instead of recreating it.",
         "security": [
           {
             "sessionCookie": []
@@ -4312,7 +4312,8 @@
         "type": "object",
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Trimmed category name, 1–100 Unicode characters; unique among current categories."
           }
         },
         "required": [
@@ -4323,7 +4324,8 @@
         "type": "object",
         "properties": {
           "title": {
-            "type": "string"
+            "type": "string",
+            "description": "Trimmed category name, 1–100 Unicode characters; unique among current categories."
           },
           "version": {
             "type": "integer",

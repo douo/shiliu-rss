@@ -119,11 +119,13 @@ type Category struct {
 
 // CategoryInput defines model for CategoryInput.
 type CategoryInput struct {
+	// Title Trimmed category name, 1–100 Unicode characters; unique among current categories.
 	Title string `json:"title"`
 }
 
 // CategoryPatch defines model for CategoryPatch.
 type CategoryPatch struct {
+	// Title Trimmed category name, 1–100 Unicode characters; unique among current categories.
 	Title   string `json:"title"`
 	Version int64  `json:"version"`
 }
