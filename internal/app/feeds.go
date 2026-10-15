@@ -146,11 +146,19 @@ func (s *Service) ListCategories(ctx context.Context) ([]Category, error) {
 	}
 	return out, rows.Err()
 }
-func (s *Service) CreateCategory(ctx context.Context, title string) (Category, error) {
-	var c Category
+func categoryTitle(title string) (string, error) {
 	title = strings.TrimSpace(title)
 	if title == "" || len([]rune(title)) > 100 {
-		return c, ErrInvalid
+		return "", ErrInvalid
+	}
+	return title, nil
+}
+func (s *Service) CreateCategory(ctx context.Context, title string) (Category, error) {
+	var c Category
+	var err error
+	title, err = categoryTitle(title)
+	if err != nil {
+		return c, err
 	}
 	e := s.write(ctx, func(tx *sql.Tx) error {
 		r, e := tx.ExecContext(ctx, `INSERT INTO categories(title)VALUES(?)`, title)
@@ -167,9 +175,10 @@ func (s *Service) CreateCategory(ctx context.Context, title string) (Category, e
 	return c, e
 }
 func (s *Service) UpdateCategory(ctx context.Context, categoryID string, version int64, title string) (Category, error) {
-	title = strings.TrimSpace(title)
-	if title == "" {
-		return Category{}, ErrInvalid
+	var err error
+	title, err = categoryTitle(title)
+	if err != nil {
+		return Category{}, err
 	}
 	c := Category{ID: categoryID, Title: title, Version: version + 1}
 	e := s.write(ctx, func(tx *sql.Tx) error {

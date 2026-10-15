@@ -204,7 +204,14 @@ func (s *Service) ImportCategory(ctx context.Context, instance, sourceID, title 
 		var target string
 		e := tx.QueryRowContext(ctx, `SELECT target_id FROM imports WHERE source_instance=? AND entity_type='category' AND source_id=?`, instance, sourceID).Scan(&target)
 		if e == nil {
-			return tx.QueryRowContext(ctx, `SELECT id,title,version FROM categories WHERE id=?`, target).Scan(&out.ID, &out.Title, &out.Version)
+			e = tx.QueryRowContext(ctx, `SELECT id,title,version FROM categories WHERE id=?`, target).Scan(&out.ID, &out.Title, &out.Version)
+			// A retained import mapping records the original user's decision.
+			// Repeating a migration must not resurrect a subsequently deleted
+			// category or move feeds back into it.
+			if e == sql.ErrNoRows {
+				return fmt.Errorf("%w: imported category was deleted after import", ErrConflict)
+			}
+			return e
 		}
 		if e != sql.ErrNoRows {
 			return e
