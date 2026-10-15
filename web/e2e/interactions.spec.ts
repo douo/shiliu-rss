@@ -66,15 +66,25 @@ const article = (id: string) => ({
     }
   ]
 });
-async function mock(page: Page, { expires = false, conflict = false } = {}) {
-  const items = Array.from({ length: 30 }, (_, i) => article(String(i + 1)));
+async function mock(page: Page, { expires = false, conflict = false, longMetadata = false } = {}) {
+  const source = longMetadata
+    ? { ...feed, title: '合成超长订阅源名称'.repeat(8) + 'UnbrokenSource'.repeat(12) }
+    : feed;
+  const items = Array.from({ length: 30 }, (_, i) => ({
+    ...article(String(i + 1)),
+    feed_title: source.title
+  }));
+  if (longMetadata) {
+    items[0].title = '合成文章长标题'.repeat(12) + 'UnbrokenTitle'.repeat(12);
+    items[0].author = 'SyntheticAuthor'.repeat(24);
+  }
   await page.route('**/api/v1/**', async (route) => {
     const req = route.request(),
       url = new URL(req.url()),
       path = url.pathname;
     let result: unknown;
     if (path.endsWith('/session')) result = { authenticated: true, csrf_token: 'synthetic-csrf' };
-    else if (path.endsWith('/feeds')) result = [feed];
+    else if (path.endsWith('/feeds')) result = [source];
     else if (path.endsWith('/categories')) result = [];
     else if (path.endsWith('/articles')) result = { items, next_cursor: '', high_watermark: '30' };
     else if (/\/articles\/\d+$/.test(path)) {
@@ -191,4 +201,36 @@ test('token scopes, one-time secret, and revocation stay in memory', async ({ pa
   await expect(page.getByText('synthetic-once-secret', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
   await expect(page.getByText('已撤销', { exact: true })).toBeVisible();
+});
+
+test('long source titles and reader metadata fit the viewport without hiding navigation', async ({
+  page
+}, info) => {
+  await mock(page, { longMetadata: true });
+  await page.goto('/');
+  if (info.project.name === 'mobile')
+    await page.getByRole('button', { name: '打开导航', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: '订阅源', exact: true })
+    .getByRole('button')
+    .first()
+    .click();
+  await page.locator('.article-row').first().waitFor();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(
+    await page.locator('.article-list').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)
+  ).toBe(true);
+  const count = await page.locator('.article-count').boundingBox();
+  expect(count!.x + count!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  if (info.project.name === 'mobile')
+    await expect(page.getByRole('button', { name: '打开导航', exact: true })).toBeVisible();
+  await page.locator('.article-row').first().click();
+  await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  expect(await page.locator('.reader').evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(
+    true
+  );
+  await page.getByRole('button', { name: '返回列表 (Esc)', exact: true }).click();
+  await expect(page.locator('.article-row').first()).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
