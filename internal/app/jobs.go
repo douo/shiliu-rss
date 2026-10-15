@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"math/rand/v2"
+	"strings"
 	"time"
 )
 
@@ -208,7 +209,26 @@ func (s *Service) CompleteFulltextJob(ctx context.Context, jobID, owner string, 
 			return e
 		}
 		expiry := parse(seen).AddDate(0, 0, 90)
-		if hadPurged > 0 || !s.Now().Before(expiry) {
+		var reason string
+		if e = tx.QueryRowContext(ctx, `SELECT reason FROM jobs WHERE id=?`, jobID).Scan(&reason); e != nil {
+			return e
+		}
+		if strings.HasPrefix(reason, "morning_report:") {
+			var active int
+			if e = tx.QueryRowContext(ctx, `SELECT count(*) FROM agent_runs r JOIN agent_settings s ON s.version=r.config_version AND s.id=1 WHERE r.id=? AND r.state IN ('queued','running','waiting_retry') AND json_extract(s.config,'$.enabled')=1`, strings.TrimPrefix(reason, "morning_report:")).Scan(&active); e != nil {
+				return e
+			}
+			if active != 1 {
+				return s.finish(ctx, tx, j)
+			}
+			var eligible int
+			if e = tx.QueryRowContext(ctx, `SELECT count(*) FROM articles a JOIN feeds f ON f.id=a.feed_id WHERE a.id=? AND a.removed=0 AND NOT EXISTS(SELECT 1 FROM article_content WHERE article_id=a.id AND state='purged') AND (a.favorite=1 OR f.archive=1 OR max(julianday(a.first_seen_at)+90,COALESCE(julianday(a.protection_until),0))>julianday(?))`, j.TargetID, stamp(s.Now())).Scan(&eligible); e != nil {
+				return e
+			}
+			if eligible != 1 {
+				return s.finish(ctx, tx, j)
+			}
+		} else if hadPurged > 0 || !s.Now().Before(expiry) {
 			expiry = s.Now().AddDate(0, 0, 90)
 		}
 		_, e = tx.ExecContext(ctx, `INSERT INTO article_content(article_id,kind,html,text,hash,state,obtained_at,expires_at)VALUES(?,'fulltext',?,?,?,'available',?,?) ON CONFLICT(article_id,kind) DO UPDATE SET html=excluded.html,text=excluded.text,hash=excluded.hash,state='available',obtained_at=excluded.obtained_at,expires_at=excluded.expires_at`, j.TargetID, result.HTML, result.Text, hash(result.HTML+"\x00"+result.Text), stamp(s.Now()), stamp(expiry))

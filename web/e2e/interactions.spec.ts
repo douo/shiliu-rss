@@ -208,7 +208,7 @@ test('token scopes, one-time secret, and revocation stay in memory', async ({ pa
     } else await route.fulfill({ json: created ? [record] : [] });
   });
   await page.goto('/?settings=true');
-  await page.getByRole('button', { name: 'Agent 授权', exact: true }).click();
+  await page.getByRole('button', { name: '访问令牌', exact: true }).click();
   await page.getByLabel('用途名称').fill(record.name);
   await page.getByLabel('写入摘要与分析').check();
   await page.getByRole('button', { name: '创建令牌', exact: true }).click();

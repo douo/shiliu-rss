@@ -2,7 +2,7 @@
 
 一个自托管的个人 RSS 阅读器：可靠后台更新，清爽阅读，按源保存，正式 Agent API。Go + SQLite 单进程，Svelte 5 / TypeScript / SvelteKit 静态前端，Tailwind CSS 4。图标使用 [抽象石榴 SVG](assets/icon.svg)。
 
-**首版已实现并完成本机验证（2026-10-15）。** 另已按用户要求只读抽取部分 NAS Miniflux 数据，在本机预览验证；NAS 部署、全量迁移和 Miniflux 切换未执行。已实现的功能及验证边界见 [实施验收记录](docs/implementation.md)。
+**首版及内置 Agent 已实现并完成本机验证（2026-10-16）。** 用户已授权正式部署 NAS、全量迁移并切换 Miniflux；执行结果记录在实施验收与生产运行记录。已实现的功能及验证边界见 [实施验收记录](docs/implementation.md)。
 
 ## 本机启动
 
@@ -29,11 +29,17 @@ make run
 ## 已实现
 
 - RSS / Atom / JSON Feed、分类、OPML、源设置与健康；默认 5 小时 ±1 小时自动检查，条件请求、退避、持久任务/租约、重启恢复与同站限流。
-- 近期/未读/收藏/归档、中文及英文搜索、可折叠侧栏、来源图标与跳转、分类及成员管理、手机布局、Alt+Shift 组合键、笔记/标签/Agent 摘要。新内容提示后主动更新列表，保留阅读位置。
+- 近期/未读/收藏/归档、中文及英文搜索、可折叠侧栏、来源图标与跳转、分类及成员管理、手机布局、↑/↓和避让 Vimium 默认映射的单键、笔记/标签/Agent 摘要。新内容提示后主动更新列表，保留阅读位置。
 - 隐藏与清正文分开；普通源 90 天、收藏及长期源豁免、迁入正文 30 天保护；清理同时处理衍生文本和索引，普通轮询不会填回已清正文。
-- 仅显式全文获取；失败保留已有内容。HTML 净化、出站地址检查、体积/并发限制、严格脚本 CSP、gzip 静态资源。
+- 显式全文获取及重要源晨报按策略自动补抓；失败保留已有内容。HTML 净化、出站地址检查、体积/并发限制、严格脚本 CSP、gzip 静态资源。
 - 本人密码/会话、独立可撤销 scoped token、稳定分页、增量 changes、事务幂等、版本与内容依据冲突检查。
 - Miniflux 2.3.0 一致快照导出、预览/对账/可重试导入；一致备份/恢复、升级前备份、Linux AMD64 成品与部署模板。
+
+## Agent 配置
+
+在「设置 → Agent」填写 Base URL、协议、模型名和 API Key，再启用。未配置时停用。支持 OpenAI 兼容 Responses / Chat Completions；Key 只写不回显，留空保留，或通过 `SHILIU_AGENT_API_KEY_FILE` 提供受保护文件。默认每天北京时间 08:00 汇总全部未读（含归档），来源可设重要/普通/次要；重要源完整处理，其他源有界截取。
+
+侧栏「Agent」打开 `/agent`，查看报告、覆盖明细和会话。引用打开系统内文章；全文失效不用于检索。每日 token/调用预算、续作和运行时限可配置；RAG 使用有界全文词法检索，尚无语义向量与重排。
 
 ## 可重复验证
 
@@ -41,7 +47,7 @@ make run
 make check-generated  # OpenAPI → Go/TS 生成漂移
 make check            # go vet + Svelte/TypeScript
 make test             # Go race / SQLite / 抓取 / API / 调度 / 导入恢复
-make test-web         # 先停 dev/run；隔离临时库启动 Go 静态成品，34 项浏览器验收
+make test-web         # 先停 dev/run；隔离临时库启动 Go 静态成品，42 项浏览器验收
 make build-linux      # 本机静态交叉编译 Linux AMD64 v1
 ```
 
@@ -67,4 +73,4 @@ go run ./cmd/bench-reader -maintenance -output /tmp/shiliu-scale.json
 | [操作说明](docs/operations.md) | 导入、备份恢复、Linux 检查、部署准备 |
 | [前端说明](web/README.md) | 构建、键盘/手机交互、浏览器验证 |
 
-开发、测试、构建和恢复演练全部在本机。NAS 仅接收发布产物；部署时再核对实际占用、配置端口并登记 NAS 台账，不在 NAS 安装 APR。Miniflux 保持现状。真实实例版本与相关 schema 已核对，兼容源的小样本已导入本机；全量特殊源处理、最终稳定窗口及切换仍需另行执行。
+开发、测试、构建和恢复演练全部在本机。NAS 仅接收发布产物；部署时再核对实际占用、配置端口并登记 NAS 台账，不在 NAS 安装 APR。正式迁移采用独立数据库预览与对账，切换后保留 Miniflux 数据及回退依据。生产步骤见 [运行说明](docs/production.md)。

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const feedCols = `id,url,title,site_url,COALESCE(category_id,''),paused,archive,interval_hours,read_days,unread_days,etag,last_modified,allow_host,last_attempt_at,last_success_at,next_check_at,error,version`
+const feedCols = `id,url,title,site_url,COALESCE(category_id,''),paused,archive,interval_hours,read_days,unread_days,etag,last_modified,allow_host,last_attempt_at,last_success_at,next_check_at,error,version,importance`
 
 type scanner interface{ Scan(...any) error }
 
@@ -14,7 +14,7 @@ func scanFeed(row scanner) (Feed, error) {
 	var f Feed
 	var attempt, success sql.NullString
 	var next string
-	e := row.Scan(&f.ID, &f.URL, &f.Title, &f.SiteURL, &f.CategoryID, &f.Paused, &f.Archive, &f.IntervalHours, &f.ReadDays, &f.UnreadDays, &f.ETag, &f.LastModified, &f.AllowHost, &attempt, &success, &next, &f.Error, &f.Version)
+	e := row.Scan(&f.ID, &f.URL, &f.Title, &f.SiteURL, &f.CategoryID, &f.Paused, &f.Archive, &f.IntervalHours, &f.ReadDays, &f.UnreadDays, &f.ETag, &f.LastModified, &f.AllowHost, &attempt, &success, &next, &f.Error, &f.Version, &f.Importance)
 	f.LastAttemptAt = ptrTime(attempt)
 	f.LastSuccessAt = ptrTime(success)
 	f.NextCheckAt = parse(next)
@@ -43,6 +43,12 @@ func (s *Service) GetFeed(ctx context.Context, feedID string) (Feed, error) {
 	return scanFeed(s.Store.Read.QueryRowContext(ctx, `SELECT `+feedCols+` FROM feeds WHERE id=?`, feedID))
 }
 func defaultFeed(f *Feed) error {
+	if f.Importance == "" {
+		f.Importance = "normal"
+	}
+	if f.Importance != "high" && f.Importance != "normal" && f.Importance != "low" {
+		return ErrInvalid
+	}
 	f.Title = strings.TrimSpace(f.Title)
 	if f.Title == "" {
 		f.Title = "未命名订阅"
@@ -70,7 +76,7 @@ func (s *Service) createFeed(ctx context.Context, tx *sql.Tx, f Feed) (Feed, err
 	}
 	f.URL = normalizeURL(f.URL)
 	f.NextCheckAt = s.Now()
-	r, e := tx.ExecContext(ctx, `INSERT INTO feeds(url,title,site_url,category_id,paused,archive,interval_hours,read_days,unread_days,next_check_at,allow_host) VALUES(?,?,?,NULLIF(?,''),?,?,?,?,?,?,?)`, f.URL, f.Title, f.SiteURL, f.CategoryID, f.Paused, f.Archive, f.IntervalHours, f.ReadDays, f.UnreadDays, stamp(f.NextCheckAt), f.AllowHost)
+	r, e := tx.ExecContext(ctx, `INSERT INTO feeds(url,title,site_url,category_id,paused,archive,interval_hours,read_days,unread_days,next_check_at,allow_host,importance) VALUES(?,?,?,NULLIF(?,''),?,?,?,?,?,?,?,?)`, f.URL, f.Title, f.SiteURL, f.CategoryID, f.Paused, f.Archive, f.IntervalHours, f.ReadDays, f.UnreadDays, stamp(f.NextCheckAt), f.AllowHost, f.Importance)
 	if e != nil {
 		return f, e
 	}
@@ -92,7 +98,7 @@ func (s *Service) UpdateFeed(ctx context.Context, feedID string, version int64, 
 		return Feed{}, e
 	}
 	e := s.write(ctx, func(tx *sql.Tx) error {
-		r, e := tx.ExecContext(ctx, `UPDATE feeds SET url=?,title=?,site_url=?,category_id=NULLIF(?,''),paused=?,archive=?,interval_hours=?,read_days=?,unread_days=?,allow_host=?,version=version+1 WHERE id=? AND version=?`, normalizeURL(f.URL), f.Title, f.SiteURL, f.CategoryID, f.Paused, f.Archive, f.IntervalHours, f.ReadDays, f.UnreadDays, f.AllowHost, feedID, version)
+		r, e := tx.ExecContext(ctx, `UPDATE feeds SET url=?,title=?,site_url=?,category_id=NULLIF(?,''),paused=?,archive=?,interval_hours=?,read_days=?,unread_days=?,allow_host=?,importance=?,version=version+1 WHERE id=? AND version=?`, normalizeURL(f.URL), f.Title, f.SiteURL, f.CategoryID, f.Paused, f.Archive, f.IntervalHours, f.ReadDays, f.UnreadDays, f.AllowHost, f.Importance, feedID, version)
 		if e = affected(r, e); e != nil {
 			return e
 		}

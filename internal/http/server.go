@@ -20,7 +20,9 @@ type Scheduler interface {
 	Wake()
 	Status() (time.Time, *time.Time, time.Time, bool)
 }
+type AgentScheduler interface{ Wake() }
 type Server struct {
+	Agent        AgentScheduler
 	App          *app.Service
 	Origin       string
 	CookieSecure bool
@@ -253,6 +255,9 @@ func (s *Server) ListFeeds(ctx context.Context, r api.ListFeedsRequestObject) (a
 	return convert[api.ListFeeds200JSONResponse](v)
 }
 func feedInput(p api.FeedInput, base app.Feed) app.Feed {
+	if p.Importance != nil {
+		base.Importance = string(*p.Importance)
+	}
 	base.Title = p.Title
 	base.URL = p.Url
 	if p.Archive != nil {

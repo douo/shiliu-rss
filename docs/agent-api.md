@@ -1,6 +1,6 @@
 # Agent 接入
 
-本文描述已实现的首版外部API。本次新增内置晨报、对话、外部查询/报告按 [Agent系统设计](agent-design.md) 重设计；新增接口仍是草案，未进入实际OpenAPI。用户要求简化，本次不新增Agent角色、scope或逐次批准流程，复用现有入口。
+本文描述已实现的首版外部API。新增内置晨报、对话、外部查询/报告已实现并进入 OpenAPI，详见 [Agent系统设计](agent-design.md)。用户要求简化，本次不新增Agent角色、scope或逐次批准流程，复用现有入口。
 
 共同契约为 [OpenAPI 3.1](../api/openapi.yaml)，生成 [Go 严格处理器](../api/generated.go) 和 [TypeScript 类型](../web/src/lib/api.generated.ts)。`make check-generated` 检查漂移。浏览器与 Agent 调用同一业务层，没有直写数据库的 Agent 接口。
 
@@ -26,7 +26,7 @@
 
 新文章插入或导入旧时间文章用 changes 补齐；不在每页重置初始高水位。默认每页 50，最多 200。changes 首版不截断；搜索最多 8 个空白分隔项、128 字符，字面短语 AND，不开放 FTS 操作符。多页搜索不提供冻结的排名快照。
 
-这也不是冻结未读集合：扫描中阅读状态仍会变化。内置/外部晨报应使用拟新增的report run成员快照，不能把这套普通分页说明解释成“截止时全部未读”的保证。新报告引用由文章ID生成内部路径 `/?scope=all&article=<id>`，模型不自行构造源站URL。
+这也不是冻结未读集合：扫描中阅读状态仍会变化。内置/外部晨报应使用已实现的 report run 成员快照，不能把这套普通分页说明解释成“截止时全部未读”的保证。新报告引用由文章ID生成内部路径 `/?scope=all&article=<id>`，模型不自行构造源站URL。
 
 ## 写回、任务与冲突
 
@@ -39,3 +39,22 @@
 分类管理只允许本人会话。分类名去除首尾空白后为1–100个Unicode字符且唯一，重名返回409。删除分类在同一事务内把成员源移至未分类、递增源版本并记录changes，再删除分类；订阅、文章、正文和阅读状态保留。删除后不能用旧版本覆盖订阅的新归属；重复Miniflux导入遇到该已删除分类的旧身份映射会报冲突，不自动重建。
 
 错误为 `application/problem+json`：稳定 code、HTTP status、request_id、retryable。400 输入不合法，401 身份无效，403 scope/CSRF 不足，404 不存在，409 幂等/依据/身份冲突，412 版本过期，429 限速，503 超时。不要把所有错误当成可无限重试；不要改变幂等键来强行覆盖冲突。
+
+## 内置 Agent
+
+基础路径 `/api/v1/agent`，完整请求/响应见 OpenAPI。复用已有会话与 token，不新增角色或 scopes；写入保持 CSRF/幂等与版本检查。
+
+| 接口 | 行为 |
+|---|---|
+| GET/PUT `/settings`、GET `/usage` | 配置与只写 Key、每日预算账本；配置更新取消旧任务 |
+| POST `/connection-tests` | 异步结构化输出连接检查 |
+| POST `/report-runs` | 固定截止时全部未读成员，排队报告 |
+| GET `/runs`、GET `/runs/{id}` | 历史、进度及结果；模型任务返回202后轮询 |
+| POST `/runs/{id}/control` | cancel/retry；复用已完成步骤 |
+| GET `/reports/{id}/members` | 固定成员分页及处理深度/卡片 |
+| PUT `/reports/{id}/result` | 外部结构化汇报；校验成员/hash/分组并重建内部引用 |
+| GET/POST `/conversations` | 会话列表与创建，可关联报告 |
+| GET/POST `/conversations/{id}/messages` | 历史与幂等消息 |
+| POST `/queries` | 无状态有界检索与查询 |
+
+外部汇报先建报告快照并取消内置执行；正在执行时拒绝覆盖。外部报告标记 partial，覆盖数由成员账本计算，不能自报已读全文。引用路径由服务端以文章 ID 构造，模型不能提供任意链接。文章、检索片段与用户引用资料均作为外部内容，不具有系统指令权。

@@ -25,7 +25,17 @@ client.use({
         .catch(() => ({}));
       throw new APIError(
         response.status,
-        problem.detail || problem.title || `请求失败 (${response.status})`
+        (
+          {
+            agent_disabled: '请先配置并启用 Agent',
+            agent_budget_exhausted: '已达到今日调用预算',
+            invalid_request: '请检查输入内容',
+            version_mismatch: '配置已更新，请刷新后重试'
+          } as Record<string, string>
+        )[problem.code] ||
+          problem.detail ||
+          problem.title ||
+          `请求失败 (${response.status})`
       );
     }
   }
@@ -44,6 +54,7 @@ const feedInput = (feed: Partial<Feed>): components['schemas']['FeedInput'] => (
   interval_hours: feed.interval_hours,
   read_days: feed.read_days,
   unread_days: feed.unread_days,
+  importance: feed.importance,
   version: feed.version
 });
 export const api = {
@@ -135,5 +146,57 @@ export const api = {
   revoke: (id: string) => data(client.DELETE('/api/v1/tokens/{id}', { params: { path: { id } } })),
   importOPML: (xml: string) => data(client.POST('/api/v1/opml', { body: { xml } })),
   exportOPML: () => data(client.GET('/api/v1/opml', { parseAs: 'text' })),
+  agentSettings: () => data(client.GET('/api/v1/agent/settings')),
+  saveAgentSettings: (settings: components['schemas']['AgentSettings'], api_key?: string) =>
+    data(client.PUT('/api/v1/agent/settings', { body: { settings, api_key } })),
+  agentUsage: () => data(client.GET('/api/v1/agent/usage')),
+  agentTest: () =>
+    data(
+      client.POST('/api/v1/agent/connection-tests', {
+        params: { header: { 'Idempotency-Key': crypto.randomUUID() } }
+      })
+    ),
+  agentReport: () =>
+    data(
+      client.POST('/api/v1/agent/report-runs', {
+        params: { header: { 'Idempotency-Key': crypto.randomUUID() } }
+      })
+    ),
+  agentRuns: (kind = 'report', before = '') =>
+    data(client.GET('/api/v1/agent/runs', { params: { query: { kind, before } } })),
+  agentRun: (id: string) =>
+    data(client.GET('/api/v1/agent/runs/{id}', { params: { path: { id } } })),
+  agentControl: (id: string, action: 'cancel' | 'retry') =>
+    data(
+      client.POST('/api/v1/agent/runs/{id}/control', { params: { path: { id } }, body: { action } })
+    ),
+  agentMembers: (id: string, after = '') =>
+    data(
+      client.GET('/api/v1/agent/reports/{id}/members', {
+        params: { path: { id }, query: { after, limit: 50 } }
+      })
+    ),
+  agentConversations: (before = '') =>
+    data(client.GET('/api/v1/agent/conversations', { params: { query: { before } } })),
+  agentConversation: (report_id?: string) =>
+    data(
+      client.POST('/api/v1/agent/conversations', {
+        params: { header: { 'Idempotency-Key': crypto.randomUUID() } },
+        body: { report_id }
+      })
+    ),
+  agentMessages: (id: string, before = '') =>
+    data(
+      client.GET('/api/v1/agent/conversations/{id}/messages', {
+        params: { path: { id }, query: { before } }
+      })
+    ),
+  agentSend: (id: string, text: string) =>
+    data(
+      client.POST('/api/v1/agent/conversations/{id}/messages', {
+        params: { path: { id }, header: { 'Idempotency-Key': crypto.randomUUID() } },
+        body: { text }
+      })
+    ),
   health: () => data(client.GET('/api/v1/health'))
 };

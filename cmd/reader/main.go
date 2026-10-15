@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gofrs/flock"
+	"shiliu-rss/internal/agent"
 	"shiliu-rss/internal/app"
 	"shiliu-rss/internal/fetch"
 	httpapi "shiliu-rss/internal/http"
@@ -203,7 +204,12 @@ func run() error {
 		runner.BackupDir = os.Getenv("SHILIU_BACKUP_DIR")
 		done := make(chan struct{})
 		go func() { runner.Run(ctx); close(done) }()
-		server := &httpapi.Server{App: service, Origin: env("SHILIU_ORIGIN", "http://127.0.0.1:41001"), CookieSecure: env("SHILIU_COOKIE_SECURE", "true") != "false", Scheduler: runner, Assets: webassets.Files()}
+		agentRunner := agent.New(service)
+		agentRunner.FetchWake = runner.Wake
+		agentDone := make(chan struct{})
+		go func() { agentRunner.Run(ctx); close(agentDone) }()
+		defer func() { cancel(); <-agentDone }()
+		server := &httpapi.Server{App: service, Origin: env("SHILIU_ORIGIN", "http://127.0.0.1:41001"), CookieSecure: env("SHILIU_COOKIE_SECURE", "true") != "false", Scheduler: runner, Agent: agentRunner, Assets: webassets.Files()}
 		httpServer := &http.Server{Addr: env("SHILIU_ADDR", "127.0.0.1:41001"), Handler: server.Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 20 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 64 << 10}
 		errch := make(chan error, 1)
 		go func() { slog.Info("reader_started"); errch <- httpServer.ListenAndServe() }()

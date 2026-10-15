@@ -17,6 +17,7 @@
   import { modal } from './modal';
   import CategoryManager from './CategoryManager.svelte';
   import FeedIcon from './FeedIcon.svelte';
+  import AgentConfig from './AgentConfig.svelte';
   let {
     feeds,
     categories,
@@ -110,6 +111,7 @@
           category_id: categoryId,
           paused: false,
           archive: false,
+          importance: 'normal',
           interval_hours: 5,
           read_days: 7,
           unread_days: 30
@@ -165,7 +167,7 @@
     <button class="icon-button" onclick={onclose} aria-label="关闭设置"><X size={21} /></button>
   </header>
   <nav class="settings-tabs" aria-label="设置分类">
-    {#each [['feeds', '订阅与保存'], ['categories', '分类'], ['tokens', 'Agent 授权'], ['health', '运行状态']] as [id, label]}<button
+    {#each [['feeds', '订阅与保存'], ['categories', '分类'], ['agent', 'Agent 配置'], ['tokens', '访问令牌'], ['health', '运行状态']] as [id, label]}<button
         class:chosen={tab === id}
         onclick={() => switchTab(id)}>{label}</button
       >{/each}
@@ -200,6 +202,28 @@
           >{/each}</select
       >
     </div>
+    <div class="button-row">
+      <label
+        >将筛选出的 {visibleFeeds.length} 个源设为
+        <select
+          aria-label="批量设置重要度"
+          disabled={busy || !visibleFeeds.length}
+          onchange={(e) => {
+            const importance = e.currentTarget.value as Feed['importance'];
+            if (!importance) return;
+            action(async () => {
+              for (const feed of visibleFeeds) await api.saveFeed({ ...feed, importance });
+              await onupdate();
+              message = '重要度已更新';
+            });
+            e.currentTarget.value = '';
+          }}
+          ><option value="">选择重要度</option><option value="high">重要</option><option
+            value="normal">普通</option
+          ><option value="low">次要</option></select
+        ></label
+      >
+    </div>
     <div class="feed-settings-list">
       {#each visibleFeeds as feed}<div class="feed-setting">
           <FeedIcon {feed} />
@@ -210,7 +234,11 @@
               {feed.paused
                 ? '已暂停'
                 : feed.error || `下次检查 ${new Date(feed.next_check_at).toLocaleString('zh-CN')}`} ·
-              {feed.archive ? '长期存档' : '普通保存'}
+              {feed.archive ? '长期存档' : '普通保存'} · {{
+                high: '重要',
+                normal: '普通',
+                low: '次要'
+              }[feed.importance]}
             </p>
             <small
               >最近成功：{feed.last_success_at
@@ -257,6 +285,8 @@
     </div>
   {:else if tab === 'categories'}
     <CategoryManager {feeds} {categories} {onupdate} onedit={edit} />
+  {:else if tab === 'agent'}
+    <AgentConfig />
   {:else if tab === 'tokens'}
     <div class="section-title">
       <div>
@@ -378,6 +408,13 @@
             ><option value="">未分类</option>{#each categories as c}<option value={c.id}
                 >{c.title}</option
               >{/each}</select
+          >
+          <label for="feed-importance">晨报重要度</label><select
+            id="feed-importance"
+            bind:value={editing.importance}
+            ><option value="high">重要 · 全文总结，必要时自动补抓</option><option value="normal"
+              >普通 · 摘要与正文截取</option
+            ><option value="low">次要 · 标题与短截取</option></select
           >
           <div class="policy-grid">
             <label

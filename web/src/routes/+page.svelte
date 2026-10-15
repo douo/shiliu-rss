@@ -674,6 +674,7 @@
           </nav>{/if}
       </div>
       <div class="sidebar-bottom">
+        <a class="button secondary compact" href="/agent">Agent</a>
         <button onclick={() => showSettings()} title="设置与授权" aria-label="设置与授权"
           ><Settings2 size={17} /></button
         >

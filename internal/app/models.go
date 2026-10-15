@@ -24,6 +24,7 @@ type Feed struct {
 	Title         string     `json:"title"`
 	SiteURL       string     `json:"site_url"`
 	CategoryID    string     `json:"category_id"`
+	Importance    string     `json:"importance"`
 	Paused        bool       `json:"paused"`
 	Archive       bool       `json:"archive"`
 	IntervalHours int        `json:"interval_hours"`

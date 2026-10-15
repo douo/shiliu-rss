@@ -18,6 +18,105 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AgentControlAction.
+const (
+	Cancel AgentControlAction = "cancel"
+	Retry  AgentControlAction = "retry"
+)
+
+// Valid indicates whether the value is a known member of the AgentControlAction enum.
+func (e AgentControlAction) Valid() bool {
+	switch e {
+	case Cancel:
+		return true
+	case Retry:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentSettingsOutputMode.
+const (
+	JsonObject AgentSettingsOutputMode = "json_object"
+	JsonSchema AgentSettingsOutputMode = "json_schema"
+	TextJson   AgentSettingsOutputMode = "text_json"
+)
+
+// Valid indicates whether the value is a known member of the AgentSettingsOutputMode enum.
+func (e AgentSettingsOutputMode) Valid() bool {
+	switch e {
+	case JsonObject:
+		return true
+	case JsonSchema:
+		return true
+	case TextJson:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AgentSettingsProtocol.
+const (
+	ChatCompletions AgentSettingsProtocol = "chat_completions"
+	Responses       AgentSettingsProtocol = "responses"
+)
+
+// Valid indicates whether the value is a known member of the AgentSettingsProtocol enum.
+func (e AgentSettingsProtocol) Valid() bool {
+	switch e {
+	case ChatCompletions:
+		return true
+	case Responses:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedImportance.
+const (
+	FeedImportanceHigh   FeedImportance = "high"
+	FeedImportanceLow    FeedImportance = "low"
+	FeedImportanceNormal FeedImportance = "normal"
+)
+
+// Valid indicates whether the value is a known member of the FeedImportance enum.
+func (e FeedImportance) Valid() bool {
+	switch e {
+	case FeedImportanceHigh:
+		return true
+	case FeedImportanceLow:
+		return true
+	case FeedImportanceNormal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FeedInputImportance.
+const (
+	FeedInputImportanceHigh   FeedInputImportance = "high"
+	FeedInputImportanceLow    FeedInputImportance = "low"
+	FeedInputImportanceNormal FeedInputImportance = "normal"
+)
+
+// Valid indicates whether the value is a known member of the FeedInputImportance enum.
+func (e FeedInputImportance) Valid() bool {
+	switch e {
+	case FeedInputImportanceHigh:
+		return true
+	case FeedInputImportanceLow:
+		return true
+	case FeedInputImportanceNormal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListArticlesParamsScope.
 const (
 	All     ListArticlesParamsScope = "all"
@@ -37,6 +136,165 @@ func (e ListArticlesParamsScope) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// AgentBlock defines model for AgentBlock.
+type AgentBlock struct {
+	Citations   []AgentCitation `json:"citations"`
+	EvidenceIds []string        `json:"evidence_ids"`
+	Kind        string          `json:"kind"`
+	Text        string          `json:"text"`
+}
+
+// AgentCitation defines model for AgentCitation.
+type AgentCitation struct {
+	ArticleId string `json:"article_id"`
+	BasisHash string `json:"basis_hash"`
+	Kind      string `json:"kind"`
+	Title     string `json:"title"`
+	Url       string `json:"url"`
+}
+
+// AgentControl defines model for AgentControl.
+type AgentControl struct {
+	Action AgentControlAction `json:"action"`
+}
+
+// AgentControlAction defines model for AgentControl.Action.
+type AgentControlAction string
+
+// AgentConversation defines model for AgentConversation.
+type AgentConversation struct {
+	CreatedAt time.Time `json:"created_at"`
+	Id        string    `json:"id"`
+	ReportId  string    `json:"report_id"`
+	Title     string    `json:"title"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// AgentConversationInput defines model for AgentConversationInput.
+type AgentConversationInput struct {
+	ReportId *string `json:"report_id,omitempty"`
+	Title    *string `json:"title,omitempty"`
+}
+
+// AgentGroup defines model for AgentGroup.
+type AgentGroup struct {
+	Blocks        []AgentBlock `json:"blocks"`
+	CategoryId    string       `json:"category_id"`
+	CategoryTitle string       `json:"category_title"`
+	Id            string       `json:"id"`
+	Importance    string       `json:"importance"`
+	Title         string       `json:"title"`
+	Total         int64        `json:"total"`
+}
+
+// AgentMember defines model for AgentMember.
+type AgentMember struct {
+	ArticleId     string       `json:"article_id"`
+	BasisHash     string       `json:"basis_hash"`
+	Card          []AgentBlock `json:"card"`
+	CategoryId    string       `json:"category_id"`
+	CategoryTitle string       `json:"category_title"`
+	Depth         string       `json:"depth"`
+	Error         string       `json:"error"`
+	FeedId        string       `json:"feed_id"`
+	FeedTitle     string       `json:"feed_title"`
+	Importance    string       `json:"importance"`
+	SnapshotHash  string       `json:"snapshot_hash"`
+	State         string       `json:"state"`
+	Title         string       `json:"title"`
+}
+
+// AgentMessage defines model for AgentMessage.
+type AgentMessage struct {
+	CreatedAt time.Time   `json:"created_at"`
+	Id        string      `json:"id"`
+	Result    AgentResult `json:"result"`
+	Role      string      `json:"role"`
+	RunId     string      `json:"run_id"`
+	Text      string      `json:"text"`
+}
+
+// AgentMessageInput defines model for AgentMessageInput.
+type AgentMessageInput struct {
+	Text string `json:"text"`
+}
+
+// AgentQuery defines model for AgentQuery.
+type AgentQuery struct {
+	Question string  `json:"question"`
+	ReportId *string `json:"report_id,omitempty"`
+}
+
+// AgentResult defines model for AgentResult.
+type AgentResult struct {
+	Blocks   []AgentBlock     `json:"blocks"`
+	Counts   map[string]int64 `json:"counts"`
+	Degraded bool             `json:"degraded"`
+	Groups   []AgentGroup     `json:"groups"`
+	Trace    []string         `json:"trace"`
+}
+
+// AgentRun defines model for AgentRun.
+type AgentRun struct {
+	Completed      int64       `json:"completed"`
+	ConfigVersion  int64       `json:"config_version"`
+	ConversationId string      `json:"conversation_id"`
+	CreatedAt      time.Time   `json:"created_at"`
+	Cutoff         time.Time   `json:"cutoff"`
+	DueAt          time.Time   `json:"due_at"`
+	Error          string      `json:"error"`
+	HighWatermark  string      `json:"high_watermark"`
+	Id             string      `json:"id"`
+	Kind           string      `json:"kind"`
+	Result         AgentResult `json:"result"`
+	State          string      `json:"state"`
+	Total          int64       `json:"total"`
+	UpdatedAt      time.Time   `json:"updated_at"`
+}
+
+// AgentSettings defines model for AgentSettings.
+type AgentSettings struct {
+	BaseUrl         string                  `json:"base_url"`
+	Configured      bool                    `json:"configured"`
+	ContextLimit    int64                   `json:"context_limit"`
+	DailyCalls      int64                   `json:"daily_calls"`
+	DailyTime       string                  `json:"daily_time"`
+	DailyTokens     int64                   `json:"daily_tokens"`
+	Enabled         bool                    `json:"enabled"`
+	KeyConfigured   bool                    `json:"key_configured"`
+	LowChars        int64                   `json:"low_chars"`
+	MaxOutput       int64                   `json:"max_output"`
+	Model           string                  `json:"model"`
+	Name            string                  `json:"name"`
+	NextReportAt    time.Time               `json:"next_report_at"`
+	NormalChars     int64                   `json:"normal_chars"`
+	OutputMode      AgentSettingsOutputMode `json:"output_mode"`
+	Protocol        AgentSettingsProtocol   `json:"protocol"`
+	RunMinutes      int64                   `json:"run_minutes"`
+	ScheduleEnabled bool                    `json:"schedule_enabled"`
+	Timezone        string                  `json:"timezone"`
+	Version         int64                   `json:"version"`
+}
+
+// AgentSettingsOutputMode defines model for AgentSettings.OutputMode.
+type AgentSettingsOutputMode string
+
+// AgentSettingsProtocol defines model for AgentSettings.Protocol.
+type AgentSettingsProtocol string
+
+// AgentSettingsInput defines model for AgentSettingsInput.
+type AgentSettingsInput struct {
+	ApiKey   *string       `json:"api_key,omitempty"`
+	Settings AgentSettings `json:"settings"`
+}
+
+// AgentUsage defines model for AgentUsage.
+type AgentUsage struct {
+	Calls        int64 `json:"calls"`
+	Tokens       int64 `json:"tokens"`
+	UnknownCalls int64 `json:"unknown_calls"`
 }
 
 // Article defines model for Article.
@@ -160,38 +418,46 @@ type Content struct {
 
 // Feed defines model for Feed.
 type Feed struct {
-	AllowHost     string     `json:"allow_host"`
-	Archive       bool       `json:"archive"`
-	CategoryId    string     `json:"category_id"`
-	Error         string     `json:"error"`
-	Id            string     `json:"id"`
-	IntervalHours int64      `json:"interval_hours"`
-	LastAttemptAt *time.Time `json:"last_attempt_at"`
-	LastSuccessAt *time.Time `json:"last_success_at"`
-	NextCheckAt   time.Time  `json:"next_check_at"`
-	Paused        bool       `json:"paused"`
-	ReadDays      int64      `json:"read_days"`
-	SiteUrl       string     `json:"site_url"`
-	Title         string     `json:"title"`
-	UnreadDays    int64      `json:"unread_days"`
-	Url           string     `json:"url"`
-	Version       int64      `json:"version"`
+	AllowHost     string         `json:"allow_host"`
+	Archive       bool           `json:"archive"`
+	CategoryId    string         `json:"category_id"`
+	Error         string         `json:"error"`
+	Id            string         `json:"id"`
+	Importance    FeedImportance `json:"importance"`
+	IntervalHours int64          `json:"interval_hours"`
+	LastAttemptAt *time.Time     `json:"last_attempt_at"`
+	LastSuccessAt *time.Time     `json:"last_success_at"`
+	NextCheckAt   time.Time      `json:"next_check_at"`
+	Paused        bool           `json:"paused"`
+	ReadDays      int64          `json:"read_days"`
+	SiteUrl       string         `json:"site_url"`
+	Title         string         `json:"title"`
+	UnreadDays    int64          `json:"unread_days"`
+	Url           string         `json:"url"`
+	Version       int64          `json:"version"`
 }
+
+// FeedImportance defines model for Feed.Importance.
+type FeedImportance string
 
 // FeedInput Examples: {"archive":false,"interval_hours":5,"read_days":7,"title":"示例订阅","unread_days":30,"url":"https://example.org/feed.xml"}
 type FeedInput struct {
-	AllowHost     *string `json:"allow_host,omitempty"`
-	Archive       *bool   `json:"archive,omitempty"`
-	CategoryId    *string `json:"category_id,omitempty"`
-	IntervalHours *int64  `json:"interval_hours,omitempty"`
-	Paused        *bool   `json:"paused,omitempty"`
-	ReadDays      *int64  `json:"read_days,omitempty"`
-	SiteUrl       *string `json:"site_url,omitempty"`
-	Title         string  `json:"title"`
-	UnreadDays    *int64  `json:"unread_days,omitempty"`
-	Url           string  `json:"url"`
-	Version       *int64  `json:"version,omitempty"`
+	AllowHost     *string              `json:"allow_host,omitempty"`
+	Archive       *bool                `json:"archive,omitempty"`
+	CategoryId    *string              `json:"category_id,omitempty"`
+	Importance    *FeedInputImportance `json:"importance,omitempty"`
+	IntervalHours *int64               `json:"interval_hours,omitempty"`
+	Paused        *bool                `json:"paused,omitempty"`
+	ReadDays      *int64               `json:"read_days,omitempty"`
+	SiteUrl       *string              `json:"site_url,omitempty"`
+	Title         string               `json:"title"`
+	UnreadDays    *int64               `json:"unread_days,omitempty"`
+	Url           string               `json:"url"`
+	Version       *int64               `json:"version,omitempty"`
 }
+
+// FeedInputImportance defines model for FeedInput.Importance.
+type FeedInputImportance string
 
 // Health defines model for Health.
 type Health struct {
@@ -283,6 +549,55 @@ type TokenInput struct {
 	Scopes []string `json:"scopes"`
 }
 
+// AgentTestConnectionParams defines parameters for AgentTestConnection.
+type AgentTestConnectionParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// AgentListConversationsParams defines parameters for AgentListConversations.
+type AgentListConversationsParams struct {
+	Before *string `form:"before,omitempty" json:"before,omitempty"`
+}
+
+// AgentCreateConversationParams defines parameters for AgentCreateConversation.
+type AgentCreateConversationParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// AgentListMessagesParams defines parameters for AgentListMessages.
+type AgentListMessagesParams struct {
+	Before *string `form:"before,omitempty" json:"before,omitempty"`
+}
+
+// AgentSendMessageParams defines parameters for AgentSendMessage.
+type AgentSendMessageParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// AgentQueryParams defines parameters for AgentQuery.
+type AgentQueryParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// AgentCreateReportParams defines parameters for AgentCreateReport.
+type AgentCreateReportParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
+// AgentListMembersParams defines parameters for AgentListMembers.
+type AgentListMembersParams struct {
+	After  *string `form:"after,omitempty" json:"after,omitempty"`
+	FeedId *string `form:"feed_id,omitempty" json:"feed_id,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// AgentListRunsParams defines parameters for AgentListRuns.
+type AgentListRunsParams struct {
+	Kind   *string `form:"kind,omitempty" json:"kind,omitempty"`
+	Before *string `form:"before,omitempty" json:"before,omitempty"`
+	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListArticlesParams defines parameters for ListArticles.
 type ListArticlesParams struct {
 	Scope      *ListArticlesParamsScope `form:"scope,omitempty" json:"scope,omitempty"`
@@ -331,6 +646,24 @@ type RefreshFeedParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 }
 
+// AgentCreateConversationJSONRequestBody defines body for AgentCreateConversation for application/json ContentType.
+type AgentCreateConversationJSONRequestBody = AgentConversationInput
+
+// AgentSendMessageJSONRequestBody defines body for AgentSendMessage for application/json ContentType.
+type AgentSendMessageJSONRequestBody = AgentMessageInput
+
+// AgentQueryJSONRequestBody defines body for AgentQuery for application/json ContentType.
+type AgentQueryJSONRequestBody = AgentQuery
+
+// AgentSubmitReportJSONRequestBody defines body for AgentSubmitReport for application/json ContentType.
+type AgentSubmitReportJSONRequestBody = AgentResult
+
+// AgentControlRunJSONRequestBody defines body for AgentControlRun for application/json ContentType.
+type AgentControlRunJSONRequestBody = AgentControl
+
+// AgentSaveSettingsJSONRequestBody defines body for AgentSaveSettings for application/json ContentType.
+type AgentSaveSettingsJSONRequestBody = AgentSettingsInput
+
 // BulkReadJSONRequestBody defines body for BulkRead for application/json ContentType.
 type BulkReadJSONRequestBody = BulkRead
 
@@ -366,6 +699,51 @@ type CreateTokenJSONRequestBody = TokenInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (POST /api/v1/agent/connection-tests)
+	AgentTestConnection(w http.ResponseWriter, r *http.Request, params AgentTestConnectionParams)
+
+	// (GET /api/v1/agent/conversations)
+	AgentListConversations(w http.ResponseWriter, r *http.Request, params AgentListConversationsParams)
+
+	// (POST /api/v1/agent/conversations)
+	AgentCreateConversation(w http.ResponseWriter, r *http.Request, params AgentCreateConversationParams)
+
+	// (GET /api/v1/agent/conversations/{id}/messages)
+	AgentListMessages(w http.ResponseWriter, r *http.Request, id string, params AgentListMessagesParams)
+
+	// (POST /api/v1/agent/conversations/{id}/messages)
+	AgentSendMessage(w http.ResponseWriter, r *http.Request, id string, params AgentSendMessageParams)
+
+	// (POST /api/v1/agent/queries)
+	AgentQuery(w http.ResponseWriter, r *http.Request, params AgentQueryParams)
+
+	// (POST /api/v1/agent/report-runs)
+	AgentCreateReport(w http.ResponseWriter, r *http.Request, params AgentCreateReportParams)
+
+	// (GET /api/v1/agent/reports/{id}/members)
+	AgentListMembers(w http.ResponseWriter, r *http.Request, id string, params AgentListMembersParams)
+
+	// (PUT /api/v1/agent/reports/{id}/result)
+	AgentSubmitReport(w http.ResponseWriter, r *http.Request, id string)
+
+	// (GET /api/v1/agent/runs)
+	AgentListRuns(w http.ResponseWriter, r *http.Request, params AgentListRunsParams)
+
+	// (GET /api/v1/agent/runs/{id})
+	AgentGetRun(w http.ResponseWriter, r *http.Request, id string)
+
+	// (POST /api/v1/agent/runs/{id}/control)
+	AgentControlRun(w http.ResponseWriter, r *http.Request, id string)
+
+	// (GET /api/v1/agent/settings)
+	AgentGetSettings(w http.ResponseWriter, r *http.Request)
+
+	// (PUT /api/v1/agent/settings)
+	AgentSaveSettings(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/agent/usage)
+	AgentGetUsage(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/articles)
 	ListArticles(w http.ResponseWriter, r *http.Request, params ListArticlesParams)
@@ -457,6 +835,562 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// AgentTestConnection operation middleware
+func (siw *ServerInterfaceWrapper) AgentTestConnection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentTestConnectionParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentTestConnection(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentListConversations operation middleware
+func (siw *ServerInterfaceWrapper) AgentListConversations(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentListConversationsParams
+
+	// ------------- Optional query parameter "before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentListConversations(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentCreateConversation operation middleware
+func (siw *ServerInterfaceWrapper) AgentCreateConversation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentCreateConversationParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentCreateConversation(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentListMessages operation middleware
+func (siw *ServerInterfaceWrapper) AgentListMessages(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentListMessagesParams
+
+	// ------------- Optional query parameter "before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentListMessages(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentSendMessage operation middleware
+func (siw *ServerInterfaceWrapper) AgentSendMessage(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentSendMessageParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentSendMessage(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentQuery operation middleware
+func (siw *ServerInterfaceWrapper) AgentQuery(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentQueryParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentQuery(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentCreateReport operation middleware
+func (siw *ServerInterfaceWrapper) AgentCreateReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentCreateReportParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentCreateReport(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentListMembers operation middleware
+func (siw *ServerInterfaceWrapper) AgentListMembers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentListMembersParams
+
+	// ------------- Optional query parameter "after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "after", r.URL.Query(), &params.After, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "after"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "after", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "feed_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "feed_id", r.URL.Query(), &params.FeedId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "feed_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "feed_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentListMembers(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentSubmitReport operation middleware
+func (siw *ServerInterfaceWrapper) AgentSubmitReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentSubmitReport(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentListRuns operation middleware
+func (siw *ServerInterfaceWrapper) AgentListRuns(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentListRunsParams
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "before" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "before", r.URL.Query(), &params.Before, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "before"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "before", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentListRuns(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentGetRun operation middleware
+func (siw *ServerInterfaceWrapper) AgentGetRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentGetRun(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentControlRun operation middleware
+func (siw *ServerInterfaceWrapper) AgentControlRun(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentControlRun(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentGetSettings operation middleware
+func (siw *ServerInterfaceWrapper) AgentGetSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentGetSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentSaveSettings operation middleware
+func (siw *ServerInterfaceWrapper) AgentSaveSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentSaveSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentGetUsage operation middleware
+func (siw *ServerInterfaceWrapper) AgentGetUsage(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentGetUsage(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListArticles operation middleware
 func (siw *ServerInterfaceWrapper) ListArticles(w http.ResponseWriter, r *http.Request) {
@@ -1372,6 +2306,21 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/connection-tests", wrapper.AgentTestConnection)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/conversations", wrapper.AgentListConversations)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/conversations", wrapper.AgentCreateConversation)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/conversations/{id}/messages", wrapper.AgentListMessages)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/conversations/{id}/messages", wrapper.AgentSendMessage)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/queries", wrapper.AgentQuery)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/report-runs", wrapper.AgentCreateReport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/reports/{id}/members", wrapper.AgentListMembers)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/agent/reports/{id}/result", wrapper.AgentSubmitReport)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/runs", wrapper.AgentListRuns)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/runs/{id}", wrapper.AgentGetRun)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/runs/{id}/control", wrapper.AgentControlRun)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/settings", wrapper.AgentGetSettings)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/agent/settings", wrapper.AgentSaveSettings)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/usage", wrapper.AgentGetUsage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/articles", wrapper.ListArticles)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/articles/read", wrapper.BulkRead)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/articles/{id}", wrapper.GetArticle)
@@ -1401,6 +2350,2232 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/api/v1/tokens/{id}", wrapper.RevokeToken)
 
 	return m
+}
+
+type AgentTestConnectionRequestObject struct {
+	Params AgentTestConnectionParams
+}
+
+type AgentTestConnectionResponseObject interface {
+	VisitAgentTestConnectionResponse(w http.ResponseWriter) error
+}
+
+type AgentTestConnection202JSONResponse AgentRun
+
+func (response AgentTestConnection202JSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection400ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection401ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection403ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection404ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection409ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection412ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection429ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection500ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentTestConnection503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentTestConnection503ApplicationProblemPlusJSONResponse) VisitAgentTestConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversationsRequestObject struct {
+	Params AgentListConversationsParams
+}
+
+type AgentListConversationsResponseObject interface {
+	VisitAgentListConversationsResponse(w http.ResponseWriter) error
+}
+
+type AgentListConversations200JSONResponse []AgentConversation
+
+func (response AgentListConversations200JSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations400ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations401ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations403ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations404ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations409ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations412ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations429ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations500ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListConversations503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListConversations503ApplicationProblemPlusJSONResponse) VisitAgentListConversationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversationRequestObject struct {
+	Params AgentCreateConversationParams
+	Body   *AgentCreateConversationJSONRequestBody
+}
+
+type AgentCreateConversationResponseObject interface {
+	VisitAgentCreateConversationResponse(w http.ResponseWriter) error
+}
+
+type AgentCreateConversation201JSONResponse AgentConversation
+
+func (response AgentCreateConversation201JSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation400ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation401ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation403ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation404ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation409ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation412ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation429ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation500ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateConversation503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateConversation503ApplicationProblemPlusJSONResponse) VisitAgentCreateConversationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessagesRequestObject struct {
+	Id     string `json:"id"`
+	Params AgentListMessagesParams
+}
+
+type AgentListMessagesResponseObject interface {
+	VisitAgentListMessagesResponse(w http.ResponseWriter) error
+}
+
+type AgentListMessages200JSONResponse []AgentMessage
+
+func (response AgentListMessages200JSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages400ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages401ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages403ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages404ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages409ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages412ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages429ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages500ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMessages503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMessages503ApplicationProblemPlusJSONResponse) VisitAgentListMessagesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessageRequestObject struct {
+	Id     string `json:"id"`
+	Params AgentSendMessageParams
+	Body   *AgentSendMessageJSONRequestBody
+}
+
+type AgentSendMessageResponseObject interface {
+	VisitAgentSendMessageResponse(w http.ResponseWriter) error
+}
+
+type AgentSendMessage202JSONResponse AgentRun
+
+func (response AgentSendMessage202JSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage400ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage401ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage403ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage404ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage409ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage412ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage429ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage500ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSendMessage503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSendMessage503ApplicationProblemPlusJSONResponse) VisitAgentSendMessageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQueryRequestObject struct {
+	Params AgentQueryParams
+	Body   *AgentQueryJSONRequestBody
+}
+
+type AgentQueryResponseObject interface {
+	VisitAgentQueryResponse(w http.ResponseWriter) error
+}
+
+type AgentQuery202JSONResponse AgentRun
+
+func (response AgentQuery202JSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery400ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery401ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery403ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery404ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery409ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery412ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery429ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery500ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentQuery503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentQuery503ApplicationProblemPlusJSONResponse) VisitAgentQueryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReportRequestObject struct {
+	Params AgentCreateReportParams
+}
+
+type AgentCreateReportResponseObject interface {
+	VisitAgentCreateReportResponse(w http.ResponseWriter) error
+}
+
+type AgentCreateReport202JSONResponse AgentRun
+
+func (response AgentCreateReport202JSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport400ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport401ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport403ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport404ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport409ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport412ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport429ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport500ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentCreateReport503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentCreateReport503ApplicationProblemPlusJSONResponse) VisitAgentCreateReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembersRequestObject struct {
+	Id     string `json:"id"`
+	Params AgentListMembersParams
+}
+
+type AgentListMembersResponseObject interface {
+	VisitAgentListMembersResponse(w http.ResponseWriter) error
+}
+
+type AgentListMembers200JSONResponse []AgentMember
+
+func (response AgentListMembers200JSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers400ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers401ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers403ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers404ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers409ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers412ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers429ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers500ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListMembers503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListMembers503ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReportRequestObject struct {
+	Id   string `json:"id"`
+	Body *AgentSubmitReportJSONRequestBody
+}
+
+type AgentSubmitReportResponseObject interface {
+	VisitAgentSubmitReportResponse(w http.ResponseWriter) error
+}
+
+type AgentSubmitReport200JSONResponse AgentRun
+
+func (response AgentSubmitReport200JSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport400ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport401ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport403ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport404ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport409ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport412ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport429ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport500ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSubmitReport503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSubmitReport503ApplicationProblemPlusJSONResponse) VisitAgentSubmitReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRunsRequestObject struct {
+	Params AgentListRunsParams
+}
+
+type AgentListRunsResponseObject interface {
+	VisitAgentListRunsResponse(w http.ResponseWriter) error
+}
+
+type AgentListRuns200JSONResponse []AgentRun
+
+func (response AgentListRuns200JSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns400ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns401ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns403ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns404ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns409ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns412ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns429ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns500ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentListRuns503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentListRuns503ApplicationProblemPlusJSONResponse) VisitAgentListRunsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRunRequestObject struct {
+	Id string `json:"id"`
+}
+
+type AgentGetRunResponseObject interface {
+	VisitAgentGetRunResponse(w http.ResponseWriter) error
+}
+
+type AgentGetRun200JSONResponse AgentRun
+
+func (response AgentGetRun200JSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun400ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun401ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun403ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun404ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun409ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun412ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun429ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun500ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetRun503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetRun503ApplicationProblemPlusJSONResponse) VisitAgentGetRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRunRequestObject struct {
+	Id   string `json:"id"`
+	Body *AgentControlRunJSONRequestBody
+}
+
+type AgentControlRunResponseObject interface {
+	VisitAgentControlRunResponse(w http.ResponseWriter) error
+}
+
+type AgentControlRun200JSONResponse AgentRun
+
+func (response AgentControlRun200JSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun400ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun401ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun403ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun404ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun409ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun412ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun429ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun500ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentControlRun503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentControlRun503ApplicationProblemPlusJSONResponse) VisitAgentControlRunResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettingsRequestObject struct {
+}
+
+type AgentGetSettingsResponseObject interface {
+	VisitAgentGetSettingsResponse(w http.ResponseWriter) error
+}
+
+type AgentGetSettings200JSONResponse AgentSettings
+
+func (response AgentGetSettings200JSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings400ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings401ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings403ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings404ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings409ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings412ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings429ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings500ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetSettings503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetSettings503ApplicationProblemPlusJSONResponse) VisitAgentGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettingsRequestObject struct {
+	Body *AgentSaveSettingsJSONRequestBody
+}
+
+type AgentSaveSettingsResponseObject interface {
+	VisitAgentSaveSettingsResponse(w http.ResponseWriter) error
+}
+
+type AgentSaveSettings200JSONResponse AgentSettings
+
+func (response AgentSaveSettings200JSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings400ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings401ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings403ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings404ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings409ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings412ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings429ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings500ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentSaveSettings503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentSaveSettings503ApplicationProblemPlusJSONResponse) VisitAgentSaveSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsageRequestObject struct {
+}
+
+type AgentGetUsageResponseObject interface {
+	VisitAgentGetUsageResponse(w http.ResponseWriter) error
+}
+
+type AgentGetUsage200JSONResponse AgentUsage
+
+func (response AgentGetUsage200JSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage400ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage401ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage403ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage404ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage409ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage412ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage429ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage500ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentGetUsage503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentGetUsage503ApplicationProblemPlusJSONResponse) VisitAgentGetUsageResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type ListArticlesRequestObject struct {
@@ -5380,6 +8555,51 @@ func (response RevokeToken503ApplicationProblemPlusJSONResponse) VisitRevokeToke
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
+	// (POST /api/v1/agent/connection-tests)
+	AgentTestConnection(ctx context.Context, request AgentTestConnectionRequestObject) (AgentTestConnectionResponseObject, error)
+
+	// (GET /api/v1/agent/conversations)
+	AgentListConversations(ctx context.Context, request AgentListConversationsRequestObject) (AgentListConversationsResponseObject, error)
+
+	// (POST /api/v1/agent/conversations)
+	AgentCreateConversation(ctx context.Context, request AgentCreateConversationRequestObject) (AgentCreateConversationResponseObject, error)
+
+	// (GET /api/v1/agent/conversations/{id}/messages)
+	AgentListMessages(ctx context.Context, request AgentListMessagesRequestObject) (AgentListMessagesResponseObject, error)
+
+	// (POST /api/v1/agent/conversations/{id}/messages)
+	AgentSendMessage(ctx context.Context, request AgentSendMessageRequestObject) (AgentSendMessageResponseObject, error)
+
+	// (POST /api/v1/agent/queries)
+	AgentQuery(ctx context.Context, request AgentQueryRequestObject) (AgentQueryResponseObject, error)
+
+	// (POST /api/v1/agent/report-runs)
+	AgentCreateReport(ctx context.Context, request AgentCreateReportRequestObject) (AgentCreateReportResponseObject, error)
+
+	// (GET /api/v1/agent/reports/{id}/members)
+	AgentListMembers(ctx context.Context, request AgentListMembersRequestObject) (AgentListMembersResponseObject, error)
+
+	// (PUT /api/v1/agent/reports/{id}/result)
+	AgentSubmitReport(ctx context.Context, request AgentSubmitReportRequestObject) (AgentSubmitReportResponseObject, error)
+
+	// (GET /api/v1/agent/runs)
+	AgentListRuns(ctx context.Context, request AgentListRunsRequestObject) (AgentListRunsResponseObject, error)
+
+	// (GET /api/v1/agent/runs/{id})
+	AgentGetRun(ctx context.Context, request AgentGetRunRequestObject) (AgentGetRunResponseObject, error)
+
+	// (POST /api/v1/agent/runs/{id}/control)
+	AgentControlRun(ctx context.Context, request AgentControlRunRequestObject) (AgentControlRunResponseObject, error)
+
+	// (GET /api/v1/agent/settings)
+	AgentGetSettings(ctx context.Context, request AgentGetSettingsRequestObject) (AgentGetSettingsResponseObject, error)
+
+	// (PUT /api/v1/agent/settings)
+	AgentSaveSettings(ctx context.Context, request AgentSaveSettingsRequestObject) (AgentSaveSettingsResponseObject, error)
+
+	// (GET /api/v1/agent/usage)
+	AgentGetUsage(ctx context.Context, request AgentGetUsageRequestObject) (AgentGetUsageResponseObject, error)
+
 	// (GET /api/v1/articles)
 	ListArticles(ctx context.Context, request ListArticlesRequestObject) (ListArticlesResponseObject, error)
 
@@ -5499,6 +8719,435 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// AgentTestConnection operation middleware
+func (sh *strictHandler) AgentTestConnection(w http.ResponseWriter, r *http.Request, params AgentTestConnectionParams) {
+	var request AgentTestConnectionRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentTestConnection(ctx, request.(AgentTestConnectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentTestConnection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentTestConnectionResponseObject); ok {
+		if err := validResponse.VisitAgentTestConnectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentListConversations operation middleware
+func (sh *strictHandler) AgentListConversations(w http.ResponseWriter, r *http.Request, params AgentListConversationsParams) {
+	var request AgentListConversationsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentListConversations(ctx, request.(AgentListConversationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentListConversations")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentListConversationsResponseObject); ok {
+		if err := validResponse.VisitAgentListConversationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentCreateConversation operation middleware
+func (sh *strictHandler) AgentCreateConversation(w http.ResponseWriter, r *http.Request, params AgentCreateConversationParams) {
+	var request AgentCreateConversationRequestObject
+
+	request.Params = params
+
+	var body AgentCreateConversationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentCreateConversation(ctx, request.(AgentCreateConversationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentCreateConversation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentCreateConversationResponseObject); ok {
+		if err := validResponse.VisitAgentCreateConversationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentListMessages operation middleware
+func (sh *strictHandler) AgentListMessages(w http.ResponseWriter, r *http.Request, id string, params AgentListMessagesParams) {
+	var request AgentListMessagesRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentListMessages(ctx, request.(AgentListMessagesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentListMessages")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentListMessagesResponseObject); ok {
+		if err := validResponse.VisitAgentListMessagesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentSendMessage operation middleware
+func (sh *strictHandler) AgentSendMessage(w http.ResponseWriter, r *http.Request, id string, params AgentSendMessageParams) {
+	var request AgentSendMessageRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	var body AgentSendMessageJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentSendMessage(ctx, request.(AgentSendMessageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentSendMessage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentSendMessageResponseObject); ok {
+		if err := validResponse.VisitAgentSendMessageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentQuery operation middleware
+func (sh *strictHandler) AgentQuery(w http.ResponseWriter, r *http.Request, params AgentQueryParams) {
+	var request AgentQueryRequestObject
+
+	request.Params = params
+
+	var body AgentQueryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentQuery(ctx, request.(AgentQueryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentQuery")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentQueryResponseObject); ok {
+		if err := validResponse.VisitAgentQueryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentCreateReport operation middleware
+func (sh *strictHandler) AgentCreateReport(w http.ResponseWriter, r *http.Request, params AgentCreateReportParams) {
+	var request AgentCreateReportRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentCreateReport(ctx, request.(AgentCreateReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentCreateReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentCreateReportResponseObject); ok {
+		if err := validResponse.VisitAgentCreateReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentListMembers operation middleware
+func (sh *strictHandler) AgentListMembers(w http.ResponseWriter, r *http.Request, id string, params AgentListMembersParams) {
+	var request AgentListMembersRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentListMembers(ctx, request.(AgentListMembersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentListMembers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentListMembersResponseObject); ok {
+		if err := validResponse.VisitAgentListMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentSubmitReport operation middleware
+func (sh *strictHandler) AgentSubmitReport(w http.ResponseWriter, r *http.Request, id string) {
+	var request AgentSubmitReportRequestObject
+
+	request.Id = id
+
+	var body AgentSubmitReportJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentSubmitReport(ctx, request.(AgentSubmitReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentSubmitReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentSubmitReportResponseObject); ok {
+		if err := validResponse.VisitAgentSubmitReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentListRuns operation middleware
+func (sh *strictHandler) AgentListRuns(w http.ResponseWriter, r *http.Request, params AgentListRunsParams) {
+	var request AgentListRunsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentListRuns(ctx, request.(AgentListRunsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentListRuns")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentListRunsResponseObject); ok {
+		if err := validResponse.VisitAgentListRunsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentGetRun operation middleware
+func (sh *strictHandler) AgentGetRun(w http.ResponseWriter, r *http.Request, id string) {
+	var request AgentGetRunRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentGetRun(ctx, request.(AgentGetRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentGetRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentGetRunResponseObject); ok {
+		if err := validResponse.VisitAgentGetRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentControlRun operation middleware
+func (sh *strictHandler) AgentControlRun(w http.ResponseWriter, r *http.Request, id string) {
+	var request AgentControlRunRequestObject
+
+	request.Id = id
+
+	var body AgentControlRunJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentControlRun(ctx, request.(AgentControlRunRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentControlRun")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentControlRunResponseObject); ok {
+		if err := validResponse.VisitAgentControlRunResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentGetSettings operation middleware
+func (sh *strictHandler) AgentGetSettings(w http.ResponseWriter, r *http.Request) {
+	var request AgentGetSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentGetSettings(ctx, request.(AgentGetSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentGetSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentGetSettingsResponseObject); ok {
+		if err := validResponse.VisitAgentGetSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentSaveSettings operation middleware
+func (sh *strictHandler) AgentSaveSettings(w http.ResponseWriter, r *http.Request) {
+	var request AgentSaveSettingsRequestObject
+
+	var body AgentSaveSettingsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentSaveSettings(ctx, request.(AgentSaveSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentSaveSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentSaveSettingsResponseObject); ok {
+		if err := validResponse.VisitAgentSaveSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentGetUsage operation middleware
+func (sh *strictHandler) AgentGetUsage(w http.ResponseWriter, r *http.Request) {
+	var request AgentGetUsageRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentGetUsage(ctx, request.(AgentGetUsageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentGetUsage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentGetUsageResponseObject); ok {
+		if err := validResponse.VisitAgentGetUsageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListArticles operation middleware

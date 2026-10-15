@@ -1,16 +1,16 @@
 # Agent 提示词与输出契约
 
-版本：`shiliu-agent/1`，2026-10-15。状态：**设计样本，尚未接入运行或完成真实模型评测**。与 [系统设计](agent-design.md) 配套；升级语义规则时递增 prompt version 并使相应缓存失效。所有例子为合成数据。
+版本：`shiliu-agent/2`，2026-10-15。状态：**system、文章、聚合与回答指令已接入；真实接口通过合成晨报/对话验证，全面语义质量评估仍待进行**。与 [系统设计](agent-design.md) 配套；升级语义规则时递增 prompt version 并使相应缓存失效。所有例子为合成数据。
 
 ## 消息组织
 
 每次请求使用以下次序：固定 system 指令 → 固定任务指令（同为 system 或该兼容接口支持的 developer 消息）→ JSON 编码的任务参数及外部资料。文章、标题、笔记、旧报告、聊天历史摘要、工具结果放在资料消息，不拼进 system/developer。资料通过 JSON 序列化编码，不能用未转义的分隔符拼字符串。
 
-服务端提供 `task_id, prompt_version, schema_version, locale, output_budget, allowed_article_ids, evidence[]`。每个 evidence 有系统生成的 `evidence_id, article_id, basis_hash, kind, obtained_at, expires_at, section, ordinal, text`；可附标题、来源、分类、时间。`kind` 为 `title / feed_excerpt / fulltext_chunk / saved_summary / query_result`，实际深度和覆盖由系统计算，不由模型自报。
+当前传入 `prompt_version`、任务参数与 `evidence[]`，文章任务另有 `articles[].article_id / required_depth / evidence_ids`。每个 evidence 包含 `evidence_id, article_id, title, basis_hash, kind, text`；有效期在业务读取/提交时校验，不交给模型决定。`kind` 为 `title / feed_excerpt / fulltext_chunk / saved_summary / query_result`，实际深度和覆盖由系统计算，不由模型自报。
 
-系统控制调用次序、预算、集合、可用工具和发布；模型输出不能直接触发 SQL/网络或修改配置。兼容服务没有原生 tools 时，用下述 planner JSON 调用相同业务函数，行为不依赖 function calling 特性。
+系统控制调用次序、预算、集合和发布；模型输出不能直接触发 SQL/网络或修改配置。当前固定检索流程使用最多三条短语/五个文章 ID 的 JSON 计划，服务端执行字面检索和当前有效片段读取，不要求 function calling。
 
-## 通用 system 指令（原文草案）
+## 通用 system 指令（已接入）
 
 ```text
 你是拾流 RSS 的内置阅读助理，帮助用户了解系统中保存的文章、未读晨报和来源状况。默认用简洁的中文，保留必要的原文专名。
@@ -50,7 +50,7 @@
 
 ## 任务 B：来源、分类与总览汇总
 
-输出 [narrative.schema.json](agent-schemas/narrative.schema.json)。每次只做一个已指定的来源/分类/总览，系统固定标题、结构、计数、成员清单和篇幅，不让模型决定忽略哪些来源。任务指令：
+输出 narrative schema。当前每次处理指定来源或文章块归并，最多两个主题块；分类由程序组织来源。后续分类/总览模型汇总可以复用同类约束。每次只做一个已指定的范围，系统固定标题、结构、计数、成员清单和篇幅，不让模型决定忽略哪些来源。任务指令：
 
 ```text
 根据 supplied_cards 汇总指定 group，不越出它的成员范围。重要度决定详略，不改变事实标准。相关内容合并成主题，重复报道注明共同事件；保留不同来源的差异和限制。
@@ -66,7 +66,11 @@
 
 来源/分类的最低展示与分配篇幅由程序保证。若模型将全部成员遗漏在正文之外，系统仍能展示成员卡片，但生成内容须人工/金标准检查代表性，不能以 `members=100%` 代替摘要质量。
 
-## 任务 C：对话检索规划
+## 当前任务 C：固定检索计划
+
+实际输出为 `{"queries":["短语"],"article_ids":["数字ID"]}`，最多三个短语（每个40字符）和五个明确文章ID。指令见 `internal/agent/chat.go`，后续固定读取精确计数、来源状态与最多十二篇的有效片段，再执行任务D。没有自主六步工具循环。
+
+### 后续可选方案：自主检索规划（未接入）
 
 输出 [step.schema.json](agent-schemas/step.schema.json)。只生成下一个步骤，任务循环最多 6 步，不要求服务支持原生 tools。任务指令：
 
@@ -142,4 +146,4 @@
 5. 合成验收至少覆盖：标题注入、正文伪造 system、JSON 分隔符、伪 ID/跨文章引用、无法回答、相互矛盾、数字单位、长文中段关键事实、标题党、重复报道、旧摘要当新消息、正文清理竞态、全称结论误用 top-k。
 6. 自动结构检查与语义检查分开记录。引用合法率/成员核对须 100%；事实支持、遗漏率、概括质量由金标准与人工审阅测量，尚未确定真实模型效果。
 
-schema 使用 JSON Schema Draft 2020-12 表达服务端契约。供应商支持的 JSON Schema 子集可能更小，适配器仅发送已支持的约束；最终仍按服务端完整规则验证。schema 文件是设计契约，尚未替代或修改实际 OpenAPI。
+schema 使用 JSON Schema Draft 2020-12 表达服务端契约。供应商支持的 JSON Schema 子集可能更小，适配器仅发送已支持的约束；最终仍按服务端完整规则验证。实际文章 schema 随运行提示词嵌入；narrative 发送兼容子集，服务端另校验必填/空值、最多40块、每块2000字符、最多40个不重复引用及事实引用非空。禁止长段照搬有效原文，释义摘要不能作为永久原文缓存。`step.schema.json` 仍是未接入的增强方案。实际网页/API契约由 `api/openapi.yaml` 生成。

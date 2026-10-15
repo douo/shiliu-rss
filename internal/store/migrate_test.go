@@ -47,7 +47,7 @@ func TestUpgradeBacksUpPriorVersionAndKeepsData(t *testing.T) {
 	}
 	defer s.Close()
 	version, _, e := schemaVersion(ctx, s.Read)
-	if e != nil || version != 2 {
+	if e != nil || version != 3 {
 		t.Fatal(version, e)
 	}
 	var title string
@@ -195,5 +195,39 @@ func TestUpgradeBackupRotationKeepsSevenVerifiedCopies(t *testing.T) {
 		if e = verifyBackup(ctx, path); e != nil {
 			t.Fatal(e)
 		}
+	}
+}
+
+func TestVersionTwoAgentUpgradePreservesReadingAndDefaultsDisabled(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "reader.db")
+	db := versionOneFixture(t, path)
+	files := fstest.MapFS{}
+	for _, name := range []string{"00001_initial.sql", "00002_site_cooldowns.sql"} {
+		b, e := migrations.Files.ReadFile(name)
+		if e != nil {
+			t.Fatal(e)
+		}
+		files[name] = &fstest.MapFile{Data: b}
+	}
+	if e := migrate(ctx, db, path, files); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := db.Exec(`INSERT INTO feeds(id,url,title,paused,next_check_at)VALUES(1,'https://example.invalid/feed','合成源',1,'2026-01-01T00:00:00Z');INSERT INTO articles(id,feed_id,title,url,first_seen_at,read_at,favorite,note)VALUES(1,1,'合成文章','https://example.invalid/article','2026-01-01T00:00:00Z','2026-01-02T00:00:00Z',1,'合成笔记')`); e != nil {
+		t.Fatal(e)
+	}
+	db.Close()
+	st, e := Open(ctx, path)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer st.Close()
+	var importance, note, read string
+	var favorite, configs int
+	if e = st.Read.QueryRow(`SELECT f.importance,a.note,a.read_at,a.favorite,(SELECT count(*) FROM agent_settings) FROM articles a JOIN feeds f ON f.id=a.feed_id WHERE a.id=1`).Scan(&importance, &note, &read, &favorite, &configs); e != nil {
+		t.Fatal(e)
+	}
+	if importance != "normal" || note != "合成笔记" || read != "2026-01-02T00:00:00Z" || favorite != 1 || configs != 0 {
+		t.Fatal("upgrade changed data", importance, note, read, favorite, configs)
 	}
 }

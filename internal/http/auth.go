@@ -170,7 +170,7 @@ func (s *Server) middleware(next api.StrictHandlerFunc, operation string) api.St
 		if e != nil {
 			return nil, e
 		}
-		if !p.Owner {
+		if !p.Owner && !strings.HasPrefix(operation, "Agent") {
 			scope := "owner"
 			switch operation {
 			case "ListArticles", "GetArticle", "ListFeeds", "ListCategories", "ListChanges", "GetJob":
@@ -341,6 +341,10 @@ func writeProblem(w http.ResponseWriter, r *http.Request, e error) {
 		status, code = auth.status, auth.code
 	case errors.Is(e, app.ErrNotFound), errors.Is(e, sql.ErrNoRows):
 		status, code = 404, "not_found"
+	case errors.Is(e, app.ErrAgentDisabled):
+		status, code = 409, "agent_disabled"
+	case errors.Is(e, app.ErrAgentBudget):
+		status, code = 429, "agent_budget_exhausted"
 	case errors.Is(e, app.ErrInvalid):
 		status, code = 400, "invalid_request"
 	case errors.Is(e, app.ErrConflict):

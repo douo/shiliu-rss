@@ -15,6 +15,7 @@ async function mockCategories(page: Page, stale = false) {
     site_url: '',
     allow_host: '',
     paused: true,
+    importance: 'normal',
     archive: false,
     interval_hours: 5,
     read_days: 7,
