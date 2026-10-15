@@ -2,6 +2,8 @@
 
 日期：2026-10-15。状态：首版实现与本机验证已完成，NAS部署待后续执行。遵守 [产品基线](product.md)；技术组合与取舍见 [技术选型](technology.md)。本文件规定模块边界和关键不变量，具体 SQL 在 migrations/，契约在 api/openapi.yaml，启动命令见 README/Makefile。
 
+**本次架构增补：** R-19–R-23 将 Agent 从外部 API 调用方扩展为系统内置模块。完整新架构见 [Agent 系统设计](agent-design.md)，状态为设计稿，尚未增加实际SQL/OpenAPI或运行功能。下列首版的身份/scope描述记录既有实现，本次不据此新增 Agent 权限系统。
+
 ## 一个进程，三类入口
 
 ```mermaid
@@ -14,7 +16,9 @@ flowchart TD
     API --> App
     App --> DB[(本地 SSD / SQLite)]
     App --> Fetch[受控抓取 / 解析 / 净化]
-    Fetch --> Sources[RSS 源 / 显式请求的文章]
+    Fetch --> Sources[RSS 源 / 显式全文及重要源晨报策略]
+    App --> Assistant[内置 Agent / 设计中]
+    Assistant --> Model[可配置模型 API / 未配置停用]
 ```
 
 静态资源服务、API、后台工作在同一个 Go 进程。Svelte 页面在浏览器运行，与 Agent 调用同一 API；应用层负责事务、权限和产品规则，存储层负责 SQL，抓取适配器负责外部输入。NAS 没有 SvelteKit/Node 服务进程。
@@ -87,6 +91,8 @@ OpenAPI 3.1.0 为契约源；用 oapi-codegen 生成 Go 类型和标准 HTTP 严
 稳定文章 ID 对外作为字符串，数据库内部可用不复用的整数主键。列表按固定 `(first_seen_at,id)` 做 keyset 分页；Agent 批量同步先取得变更高水位、按稳定 ID 导出初始集合，再追 changes，允许重复处理但不因新文章插入漏项。changes 包含正文清理、内容更新和整理状态变更；纯时间流逝造成的日常隐藏不生成海量变更，增量消费范围始终包含归档，由截止时间表达可见性。普通搜索分页不承诺冻结可变排名快照。
 
 变更日志首版保留紧凑元数据，未来若压缩须明确 cursor 失效并要求全量重新同步，不能无声跳过。API 请求不跨分页持有数据库事务。写回用 Idempotency-Key + token 身份 + 操作组成唯一键，保存请求 hash 与结果引用；同键不同内容返回 409。摘要写入另有调用方稳定 external_id，防止重试窗口之后重复产物；任务重复由活动唯一约束合并。幂等键至少保留 30 天，此期限写入契约。
+
+上述普通分页/changes不冻结未读状态。晨报需短事务一次固定成员，再在事务外读取有效内容、处理模型；新文章/已读/分类变更不悄悄改变当轮集合。新报告/会话、内部引用、独立模型执行槽、预算账本与生命周期边界按 [Agent设计](agent-design.md) 实施。
 
 编辑采用 ETag/If-Match 或显式 version，过期版本返回 412；摘要依赖的内容 hash 已变化时返回 409，并让调用方重新获取依据。正文已清理时仍可显示旧摘要及其 hash，但不谎称原文仍在。错误使用 `application/problem+json`，有稳定 code、request_id 和可重试提示；不用 HTTP 200 包装所有错误。
 

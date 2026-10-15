@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shiliu bounded agent next step v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "action", "queries", "article_ids", "report_id", "filter"],
+  "properties": {
+    "schema_version": { "const": "1" },
+    "action": { "enum": ["search", "read_articles", "counts", "source_health", "read_report", "answer"] },
+    "queries": {
+      "type": "array",
+      "maxItems": 3,
+      "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+    },
+    "article_ids": {
+      "type": "array",
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 64 }
+    },
+    "report_id": { "type": ["string", "null"], "maxLength": 64 },
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "feed_id", "category_id", "read", "since", "until"],
+      "properties": {
+        "scope": { "enum": ["all", "report"] },
+        "feed_id": { "type": ["string", "null"], "maxLength": 64 },
+        "category_id": { "type": ["string", "null"], "maxLength": 64 },
+        "read": { "type": ["boolean", "null"] },
+        "since": { "type": ["string", "null"], "format": "date-time" },
+        "until": { "type": ["string", "null"], "format": "date-time" }
+      }
+    }
+  }
+}

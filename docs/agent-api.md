@@ -1,5 +1,7 @@
 # Agent 接入
 
+本文描述已实现的首版外部API。本次新增内置晨报、对话、外部查询/报告按 [Agent系统设计](agent-design.md) 重设计；新增接口仍是草案，未进入实际OpenAPI。用户要求简化，本次不新增Agent角色、scope或逐次批准流程，复用现有入口。
+
 共同契约为 [OpenAPI 3.1](../api/openapi.yaml)，生成 [Go 严格处理器](../api/generated.go) 和 [TypeScript 类型](../web/src/lib/api.generated.ts)。`make check-generated` 检查漂移。浏览器与 Agent 调用同一业务层，没有直写数据库的 Agent 接口。
 
 基础地址 `/api/v1`。本人在设置创建 token；明文只返回一次，库里存 hash。请求使用 `Authorization: Bearer <token>`，不把 token 放 URL、浏览器 localStorage、日志或仓库。撤销在后续请求生效，业务写事务再次检查撤销，避免认证后的竞态。
@@ -23,6 +25,8 @@
 4. 变更只有对象引用/类型/版本，没有正文快照。按需重新读取当前对象；已删除对象返回 404。读到同游标表示暂时追平，之后继续轮询。
 
 新文章插入或导入旧时间文章用 changes 补齐；不在每页重置初始高水位。默认每页 50，最多 200。changes 首版不截断；搜索最多 8 个空白分隔项、128 字符，字面短语 AND，不开放 FTS 操作符。多页搜索不提供冻结的排名快照。
+
+这也不是冻结未读集合：扫描中阅读状态仍会变化。内置/外部晨报应使用拟新增的report run成员快照，不能把这套普通分页说明解释成“截止时全部未读”的保证。新报告引用由文章ID生成内部路径 `/?scope=all&article=<id>`，模型不自行构造源站URL。
 
 ## 写回、任务与冲突
 
