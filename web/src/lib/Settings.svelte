@@ -8,19 +8,28 @@
     KeyRound,
     Check,
     Trash2,
-    Rss,
+    Pause,
+    Play,
     ShieldCheck
   } from '@lucide/svelte';
   import type { Feed, Category, Token } from './models';
-  import { api } from './api';
+  import { api, APIError } from './api';
   import { modal } from './modal';
+  import CategoryManager from './CategoryManager.svelte';
+  import FeedIcon from './FeedIcon.svelte';
   let {
     feeds,
     categories,
     onupdate,
-    onclose
-  }: { feeds: Feed[]; categories: Category[]; onupdate: () => Promise<void>; onclose: () => void } =
-    $props();
+    onclose,
+    initialTab = 'feeds'
+  }: {
+    feeds: Feed[];
+    categories: Category[];
+    onupdate: () => Promise<void>;
+    onclose: () => void;
+    initialTab?: string;
+  } = $props();
   let tab = $state('feeds'),
     editing = $state<Partial<Feed> | null>(null),
     busy = $state(false),
@@ -29,11 +38,24 @@
   let tokens = $state<Token[]>([]),
     tokenName = $state(''),
     scopes = $state(['articles:read']),
-    newToken = $state(''),
-    categoryTitle = $state('');
+    newToken = $state('');
+  let feedSearch = $state(''),
+    feedCategory = $state('*');
+  const visibleFeeds = $derived(
+    feeds.filter(
+      (feed) =>
+        (feedCategory === '*' || (feed.category_id || '') === feedCategory) &&
+        `${feed.title} ${feed.url}`
+          .toLocaleLowerCase()
+          .includes(feedSearch.trim().toLocaleLowerCase())
+    )
+  );
   let preview = $state<{ articles: number; contents: number; bytes: number } | null>(null),
     health = $state<Record<string, unknown> | null>(null);
   let previewSignature = '';
+  $effect(() => {
+    tab = initialTab;
+  });
   $effect(() => {
     const signature = JSON.stringify(editing);
     if (signature !== previewSignature) {
@@ -62,18 +84,30 @@
     try {
       await fn();
     } catch (e) {
-      error = (e as Error).message;
+      if (e instanceof APIError && [409, 412].includes(e.status)) {
+        if (e.status === 412) editing = null;
+        const conflict =
+          e.status === 412
+            ? '数据已被其他操作更新，请检查当前内容后重试。'
+            : '数据存在冲突，请检查输入后重试。';
+        try {
+          await onupdate();
+          error = conflict;
+        } catch {
+          error = `${conflict} 列表刷新失败，请稍后重新打开设置。`;
+        }
+      } else error = (e as Error).message;
     } finally {
       busy = false;
     }
   }
-  function edit(feed?: Feed) {
+  function edit(feed?: Feed, categoryId = '') {
     editing = feed
       ? { ...feed }
       : {
           url: '',
           title: '',
-          category_id: '',
+          category_id: categoryId,
           paused: false,
           archive: false,
           interval_hours: 5,
@@ -131,7 +165,7 @@
     <button class="icon-button" onclick={onclose} aria-label="关闭设置"><X size={21} /></button>
   </header>
   <nav class="settings-tabs" aria-label="设置分类">
-    {#each [['feeds', '订阅与保存'], ['tokens', 'Agent 授权'], ['health', '运行状态']] as [id, label]}<button
+    {#each [['feeds', '订阅与保存'], ['categories', '分类'], ['tokens', 'Agent 授权'], ['health', '运行状态']] as [id, label]}<button
         class:chosen={tab === id}
         onclick={() => switchTab(id)}>{label}</button
       >{/each}
@@ -146,13 +180,29 @@
     <div class="section-title">
       <div>
         <h2>订阅源 <small>{feeds.length}</small></h2>
-        <p>后台独立更新，暂时失败后会自动重试。</p>
       </div>
-      <button class="button" onclick={() => edit()}><Plus size={16} />添加订阅</button>
+      <button
+        class="button"
+        onclick={() => edit(undefined, feedCategory === '*' ? '' : feedCategory)}
+        ><Plus size={16} />添加订阅</button
+      >
+    </div>
+    <div class="feed-filters">
+      <input
+        type="search"
+        aria-label="搜索订阅"
+        placeholder="搜索订阅名称或地址"
+        bind:value={feedSearch}
+      />
+      <select aria-label="按分类筛选订阅" bind:value={feedCategory}
+        ><option value="*">全部分类</option><option value="">未分类</option
+        >{#each categories as category}<option value={category.id}>{category.title}</option
+          >{/each}</select
+      >
     </div>
     <div class="feed-settings-list">
-      {#each feeds as feed}<div class="feed-setting">
-          <div class="source-icon"><Rss size={18} /></div>
+      {#each visibleFeeds as feed}<div class="feed-setting">
+          <FeedIcon {feed} />
           <div class="feed-setting-info">
             <button class="feed-title" onclick={() => edit(feed)}>{feed.title || feed.url}</button
             ><span class="source-url">{feed.url}</span>
@@ -172,27 +222,22 @@
           </div>
           <button
             class="icon-button"
+            disabled={busy}
+            onclick={() =>
+              action(async () => {
+                await api.saveFeed({ ...feed, paused: !feed.paused });
+                await onupdate();
+              })}
+            aria-label={`${feed.paused ? '恢复' : '暂停'} ${feed.title}`}
+            >{#if feed.paused}<Play size={17} />{:else}<Pause size={17} />{/if}</button
+          >
+          <button
+            class="icon-button"
             disabled={busy || feed.paused}
             onclick={() => action(() => refresh(feed.id))}
             aria-label={`刷新 ${feed.title}`}><RefreshCw size={17} /></button
           ><button class="button secondary compact" onclick={() => edit(feed)}>编辑</button>
-        </div>{/each}
-    </div>
-    <div class="settings-section">
-      <h2>分类</h2>
-      <div class="inline-form">
-        <input aria-label="新分类名称" bind:value={categoryTitle} placeholder="新分类名称" /><button
-          class="button secondary"
-          disabled={!categoryTitle.trim() || busy}
-          onclick={() =>
-            action(async () => {
-              await api.saveCategory(categoryTitle.trim());
-              categoryTitle = '';
-              await onupdate();
-            })}>添加分类</button
-        >
-      </div>
-      <p>{categories.map((c) => c.title).join(' · ') || '还没有分类'}</p>
+        </div>{:else}<p class="empty-feeds">没有匹配的订阅</p>{/each}
     </div>
     <div class="settings-section">
       <h2>订阅交换</h2>
@@ -210,6 +255,8 @@
         >
       </div>
     </div>
+  {:else if tab === 'categories'}
+    <CategoryManager {feeds} {categories} {onupdate} onedit={edit} />
   {:else if tab === 'tokens'}
     <div class="section-title">
       <div>
@@ -389,3 +436,33 @@
       </div>
     </div>{/if}
 </div>
+
+<style>
+  .feed-filters {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 15px;
+  }
+  .feed-filters input {
+    flex: 1;
+    min-width: 0;
+  }
+  .feed-filters select {
+    width: 180px;
+  }
+  .empty-feeds {
+    padding: 30px 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  @media (max-width: 600px) {
+    .feed-filters {
+      flex-wrap: wrap;
+    }
+    .feed-filters input,
+    .feed-filters select {
+      width: 100%;
+      flex-basis: 100%;
+    }
+  }
+</style>

@@ -104,6 +104,12 @@ export const api = {
         body: { title, version: c.version }
       })
     ),
+  deleteCategory: (c: Category) =>
+    data(
+      client.DELETE('/api/v1/categories/{id}', {
+        params: { path: { id: c.id }, query: { version: c.version } }
+      })
+    ),
   refresh: (id: string) =>
     data(
       client.POST('/api/v1/feeds/{id}/refresh', {
