@@ -2,7 +2,7 @@
 
 一个自托管的个人 RSS 阅读器：可靠后台更新，清爽阅读，按源保存，正式 Agent API。Go + SQLite 单进程，Svelte 5 / TypeScript / SvelteKit 静态前端，Tailwind CSS 4。图标使用 [抽象石榴 SVG](assets/icon.svg)。
 
-**首版已实现并完成本机验证（2026-10-15）。** NAS 部署、真实数据迁移和 Miniflux 切换未执行。已实现的功能及验证边界见 [实施验收记录](docs/implementation.md)。
+**首版已实现并完成本机验证（2026-10-15）。** 另已按用户要求只读抽取部分 NAS Miniflux 数据，在本机预览验证；NAS 部署、全量迁移和 Miniflux 切换未执行。已实现的功能及验证边界见 [实施验收记录](docs/implementation.md)。
 
 ## 本机启动
 
@@ -67,4 +67,4 @@ go run ./cmd/bench-reader -maintenance -output /tmp/shiliu-scale.json
 | [操作说明](docs/operations.md) | 导入、备份恢复、Linux 检查、部署准备 |
 | [前端说明](web/README.md) | 构建、键盘/手机交互、浏览器验证 |
 
-开发、测试、构建和恢复演练全部在本机。NAS 仅接收发布产物；部署时再核对实际占用、配置端口并登记 NAS 台账，不在 NAS 安装 APR。Miniflux 保持现状。真实实例 schema、特殊源配置及最终迁移窗口需要在后续授权操作中核实。
+开发、测试、构建和恢复演练全部在本机。NAS 仅接收发布产物；部署时再核对实际占用、配置端口并登记 NAS 台账，不在 NAS 安装 APR。Miniflux 保持现状。真实实例版本与相关 schema 已核对，兼容源的小样本已导入本机；全量特殊源处理、最终稳定窗口及切换仍需另行执行。
