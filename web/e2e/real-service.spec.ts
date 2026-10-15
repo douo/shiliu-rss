@@ -67,10 +67,8 @@ test('real API: subscription → background ingestion → reading → full text 
     .first()
     .click();
   await expect(page.getByText('这是一篇合成 RSS 正文，全部内容仅用于本机验证。')).toBeVisible();
-  await page.getByRole('button', { name: '收藏文章 (Alt+Shift+S)', exact: true }).click();
-  await expect(
-    page.getByRole('button', { name: '取消收藏 (Alt+Shift+S)', exact: true })
-  ).toBeVisible();
+  await page.getByRole('button', { name: '收藏文章 (s)', exact: true }).click();
+  await expect(page.getByRole('button', { name: '取消收藏 (s)', exact: true })).toBeVisible();
   await page.getByRole('textbox', { name: '我的笔记', exact: true }).fill('本机验证笔记');
   await page.getByLabel('标签', { exact: true }).fill('合成, 验证');
   await page.getByRole('button', { name: '保存笔记', exact: true }).click();

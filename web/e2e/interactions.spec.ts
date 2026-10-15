@@ -143,9 +143,9 @@ test('reading preserves list position, keyboard state, and deep links', async ({
   await expect(page.getByRole('heading', { name: '合成文章 10', exact: true })).toBeVisible();
   await expect.poll(() => items[9].read_at).toBeTruthy();
   if (info.project.name === 'desktop') {
-    await page.keyboard.press('Alt+Shift+KeyS');
+    await page.keyboard.press('s');
     await expect.poll(() => items[9].favorite).toBe(true);
-    await page.keyboard.press('Alt+Shift+ArrowDown');
+    await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('heading', { name: '合成文章 11', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
   } else await page.getByRole('button', { name: '返回列表 (Esc)', exact: true }).click();
@@ -254,52 +254,244 @@ test('long source titles and reader metadata fit the viewport without hiding nav
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
-test('single keys stay available to browser extensions; explicit shortcuts use physical codes', async ({
+test('plain arrows follow list focus and single keys operate the reader', async ({ page }) => {
+  const items = await mock(page);
+  await page.goto('/');
+  await page.locator('[data-article-id="5"]').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('[data-article-id="6"]')).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('[data-article-id="5"]')).toBeFocused();
+  await page.locator('[data-article-id="1"]').focus();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.locator('[data-article-id="1"]')).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
+  await expect.poll(() => items[0].read_at).toBeTruthy();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('heading', { name: '合成文章 2', exact: true })).toBeVisible();
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
+  await page.keyboard.press('a');
+  await expect.poll(() => items[0].read_at).toBeNull();
+  await expect(page.getByRole('button', { name: '标为已读 (a)', exact: true })).toBeVisible();
+  await page.keyboard.press('s');
+  await expect.poll(() => items[0].favorite).toBe(true);
+  await expect(page.getByRole('button', { name: '取消收藏 (s)', exact: true })).toBeVisible();
+  await page
+    .context()
+    .route('https://example.test/article', (route) => route.fulfill({ body: '原文' }));
+  const popupPromise = page.waitForEvent('popup');
+  await page.keyboard.press('e');
+  const popup = await popupPromise;
+  await expect(popup).toHaveURL('https://example.test/article');
+  await popup.close();
+  await page.bringToFront();
+  await page.keyboard.press('s');
+  await expect(page.getByRole('dialog', { name: '取消收藏前' })).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('a');
+  await page.keyboard.press('q');
+  expect(items[0].read_at).toBeNull();
+  expect(items[0].favorite).toBe(true);
+  await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-article-id="1"]')).toBeFocused();
+  await page.keyboard.press('q');
+  await expect(page.getByRole('textbox', { name: '搜索文章', exact: true })).toBeFocused();
+  await expect(page.locator('.search-box kbd')).toHaveText('q');
+});
+
+test('Vimium default keys, modifiers, and composition stay available; held action keys do not toggle', async ({
   page
 }) => {
   const items = await mock(page);
   await page.goto('/?article=1');
   await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
-  for (const key of ['j', 'k', 'm', 's', 'o', '/', '?', 'Enter']) await page.keyboard.press(key);
-  await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
-  expect(items[0].favorite).toBe(false);
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const untouched = await page.evaluate(() => {
+    const keys = [
+      'j',
+      'k',
+      'h',
+      'l',
+      'g',
+      'G',
+      'z',
+      'd',
+      'u',
+      'r',
+      'R',
+      'y',
+      'p',
+      'P',
+      'i',
+      'v',
+      'V',
+      'f',
+      'F',
+      '/',
+      'n',
+      'N',
+      '*',
+      '#',
+      'o',
+      'O',
+      'T',
+      'b',
+      'B',
+      'H',
+      'L',
+      'K',
+      'J',
+      '^',
+      '<',
+      '>',
+      'W',
+      't',
+      'x',
+      'X',
+      'm',
+      '`',
+      '?',
+      'Enter',
+      'Tab'
+    ];
+    return keys.filter((key) => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      document.activeElement!.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+  });
+  expect(untouched).toEqual([]);
   const handled = await page.evaluate(() => {
     const results: Record<string, boolean> = {};
-    for (const [code, key, extra] of [
-      ['KeyS', 'ß', {}],
-      ['KeyR', 'r', { isComposing: true }],
-      ['KeyQ', 'q', {}],
-      ['KeyB', 'b', { repeat: true }]
+    for (const [name, key, extra] of [
+      ['composing', 'a', { isComposing: true }],
+      ['alt', 's', { altKey: true }],
+      ['control', 's', { ctrlKey: true }],
+      ['meta', 's', { metaKey: true }],
+      ['shift', 's', { shiftKey: true }],
+      ['shiftArrow', 'ArrowDown', { shiftKey: true }],
+      ['oldShortcut', 'ArrowDown', { altKey: true, shiftKey: true }],
+      ['otherCharacter', 'ß', { code: 'KeyS' }],
+      ['repeatFavorite', 's', { repeat: true }],
+      ['repeatSidebar', 'c', { repeat: true }],
+      ['repeatRead', 'a', { repeat: true }],
+      ['repeatOriginal', 'e', { repeat: true }]
     ] as const) {
       const event = new KeyboardEvent('keydown', {
-        code,
         key,
-        altKey: true,
-        shiftKey: true,
         bubbles: true,
         cancelable: true,
         ...extra
       });
-      document.body.dispatchEvent(event);
-      results[code] = event.defaultPrevented;
+      document.activeElement!.dispatchEvent(event);
+      results[name] = event.defaultPrevented;
     }
     return results;
   });
-  expect(handled).toEqual({ KeyS: true, KeyR: false, KeyQ: false, KeyB: true });
-  await expect.poll(() => items[0].favorite).toBe(true);
+  expect(handled).toEqual({
+    composing: false,
+    alt: false,
+    control: false,
+    meta: false,
+    shift: false,
+    shiftArrow: false,
+    oldShortcut: false,
+    otherCharacter: false,
+    repeatFavorite: true,
+    repeatSidebar: true,
+    repeatRead: true,
+    repeatOriginal: true
+  });
+  expect(items[0].favorite).toBe(false);
+  expect(items[0].read_at).toBeTruthy();
+  await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('typing and native form navigation never invoke reading shortcuts', async ({ page }) => {
+  const items = await mock(page);
+  await page.goto('/?article=1');
   const note = page.getByRole('textbox', { name: '我的笔记', exact: true });
-  await note.focus();
-  await page.keyboard.press('Alt+Shift+KeyS');
+  await note.fill('第一行\n第二行');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.type('c a s e q');
+  await page.keyboard.press('s');
   await page.keyboard.press('Escape');
   await expect(note).toBeFocused();
-  expect(items[0].favorite).toBe(true);
-  await page.getByRole('heading', { name: '合成文章 1', exact: true }).focus();
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('Enter');
+  expect(items[0].favorite).toBe(false);
+  expect(items[0].read_at).toBeTruthy();
   await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
-  await page.keyboard.press('Alt+Shift+KeyF');
-  await expect(page.getByRole('textbox', { name: '搜索文章', exact: true })).toBeFocused();
+  await page.evaluate(() => {
+    const editable = document.createElement('div');
+    editable.contentEditable = 'true';
+    editable.setAttribute('aria-label', '合成可编辑区域');
+    editable.textContent = '正文';
+    document.querySelector('.notes')!.append(editable);
+    editable.focus();
+  });
+  await page.keyboard.type('c a s e q');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByLabel('合成可编辑区域')).toBeFocused();
+  expect(items[0].favorite).toBe(false);
+  await page.getByRole('heading', { name: '合成文章 1', exact: true }).focus();
+  await page.keyboard.press('q');
+  const search = page.getByRole('textbox', { name: '搜索文章', exact: true });
+  await page.keyboard.type('c a s e q');
+  await page.keyboard.press('ArrowDown');
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue('c a s e q');
+  await expect(page.getByRole('article', { name: '文章阅读' })).toHaveCount(0);
+});
+
+test('settings keep arrow keys and form controls; shortcut help matches the new bindings', async ({
+  page
+}, info) => {
+  await mock(page);
+  await page.goto('/?settings=true');
+  await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('a');
+  await page.keyboard.press('s');
+  await page.keyboard.press('e');
+  await page.keyboard.press('q');
+  await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
+  await expect(page.getByRole('article', { name: '文章阅读' })).toHaveCount(0);
+  const categoryFilter = page.getByRole('combobox', { name: '按分类筛选订阅', exact: true });
+  await categoryFilter.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('c');
+  await expect(categoryFilter).toBeFocused();
+  await expect(page.getByRole('heading', { name: '设置', exact: true })).toBeVisible();
+  await categoryFilter.blur();
+  await page.keyboard.press('c');
+  if (info.project.name === 'desktop') {
+    await expect(page.locator('.app-shell')).toHaveClass(/sidebar-collapsed/);
+    await page.keyboard.press('c');
+  } else await expect(page.locator('.sidebar')).toHaveClass(/open/);
+  await page.getByRole('button', { name: '快捷键', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  const help = page.getByRole('dialog', { name: '键盘阅读' });
+  await expect(help).toBeVisible();
+  await expect(help.locator('kbd')).toHaveText([
+    'c',
+    '↓ / ↑',
+    'Tab / Enter',
+    'a',
+    's',
+    'e',
+    'q',
+    'Esc'
+  ]);
+  await page.keyboard.press('c');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('q');
+  await expect(help).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(help).toHaveCount(0);
 });
 
 test('sidebar collapse expands reading space and persists; mobile navigation stays available', async ({
@@ -314,7 +506,7 @@ test('sidebar collapse expands reading space and persists; mobile navigation sta
   await page.goto('/?article=1');
   await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
   const before = await page.locator('.reader').boundingBox();
-  await page.keyboard.press('Alt+Shift+KeyB');
+  await page.keyboard.press('c');
   if (info.project.name === 'desktop') {
     await expect(page.locator('.app-shell')).toHaveClass(/sidebar-collapsed/);
     const after = await page.locator('.reader').boundingBox();
@@ -325,7 +517,7 @@ test('sidebar collapse expands reading space and persists; mobile navigation sta
     await page.screenshot({ path: 'test-results/redesign-desktop-reading.png' });
     await page.reload();
     await expect(page.locator('.app-shell')).toHaveClass(/sidebar-collapsed/);
-    await page.getByRole('button', { name: '切换侧栏 (Alt+Shift+B)', exact: true }).click();
+    await page.getByRole('button', { name: '切换侧栏 (c)', exact: true }).click();
     await expect(page.getByRole('complementary', { name: '阅读侧栏' })).toBeVisible();
   } else {
     await expect(page.locator('.sidebar')).toHaveClass(/open/);
@@ -333,6 +525,13 @@ test('sidebar collapse expands reading space and persists; mobile navigation sta
     await expect(page.locator('.sidebar')).not.toHaveClass(/open/);
     await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
     await page.screenshot({ path: 'test-results/redesign-mobile-reading.png' });
+    await page.keyboard.press('c');
+    await expect(page.locator('.sidebar')).toHaveClass(/open/);
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('heading', { name: '合成文章 1', exact: true })).toBeVisible();
+    await page.keyboard.press('q');
+    await expect(page.locator('.sidebar')).not.toHaveClass(/open/);
+    await expect(page.getByRole('textbox', { name: '搜索文章', exact: true })).toBeFocused();
   }
 });
 

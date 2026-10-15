@@ -49,7 +49,8 @@
     settingsTab = $state('feeds'),
     sidebarCollapsed = $state(false),
     sourceFilter = $state(''),
-    categoriesOpen = $state(false);
+    categoriesOpen = $state(false),
+    feedsOpen = $state(true);
   const visibleFeeds = $derived(
     feeds.filter((feed) =>
       `${feed.title} ${categories.find((c) => c.id === feed.category_id)?.title || ''}`
@@ -343,11 +344,26 @@
     void navigate('all', { feed: id });
   }
   function keyboard(e: KeyboardEvent) {
-    if (!authenticated || e.defaultPrevented || e.isComposing) return;
-    const target = e.target as HTMLElement;
-    if (target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"])'))
+    if (
+      !authenticated ||
+      e.defaultPrevented ||
+      e.isComposing ||
+      e.ctrlKey ||
+      e.metaKey ||
+      e.altKey ||
+      e.shiftKey
+    )
       return;
-    if (e.code === 'Escape' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    const target = e.target;
+    if (
+      !(target instanceof Element) ||
+      target.closest(
+        'input,textarea,select,[role="textbox"],[role="combobox"],[role="slider"],[role="spinbutton"]'
+      ) ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    )
+      return;
+    if (e.key === 'Escape') {
       if (unfavoriteTarget) unfavoriteTarget = null;
       else if (shortcutOpen) shortcutOpen = false;
       else if (navOpen) navOpen = false;
@@ -359,31 +375,38 @@
       e.preventDefault();
       return;
     }
-    if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || shortcutOpen || unfavoriteTarget)
-      return;
-    if (e.code === 'KeyB') {
+    if (shortcutOpen || unfavoriteTarget || document.querySelector('[aria-modal="true"]')) return;
+    // These keys are unused by Vimium's default mappings, including sequence prefixes.
+    if (e.key === 'c') {
       if (!e.repeat) toggleSidebar();
     } else if (settingsOpen) return;
-    else if (e.code === 'KeyF') {
+    else if (e.key === 'q') {
+      navOpen = false;
       void (async () => {
         if (selected) await closeReader();
         await tick();
         searchElement?.focus();
       })();
-    } else if (['ArrowDown', 'ArrowUp'].includes(e.code) && articles.length) {
-      const n = e.code === 'ArrowDown' ? 1 : -1;
+    } else if (navOpen) return;
+    else if (['ArrowDown', 'ArrowUp'].includes(e.key) && articles.length) {
+      const n = e.key === 'ArrowDown' ? 1 : -1;
       if (selected) void move(n);
       else {
+        const focusedIndex = articles.findIndex(
+          (article) =>
+            article.id === target.closest('[data-article-id]')?.getAttribute('data-article-id')
+        );
+        if (focusedIndex !== -1) activeIndex = focusedIndex;
         activeIndex = Math.min(articles.length - 1, Math.max(0, activeIndex + n));
         document
           .querySelector<HTMLButtonElement>(`[data-article-id="${articles[activeIndex]?.id}"]`)
           ?.focus();
       }
-    } else if (selected && e.code === 'KeyR') {
+    } else if (selected && e.key === 'a') {
       if (!e.repeat) void patch({ read: !selected.read_at }).catch(() => {});
-    } else if (selected && e.code === 'KeyS') {
+    } else if (selected && e.key === 's') {
       if (!e.repeat) void patch({ favorite: !selected.favorite }).catch(() => {});
-    } else if (selected && e.code === 'KeyO' && externalURL(selected.url)) {
+    } else if (selected && e.key === 'e' && externalURL(selected.url)) {
       if (!e.repeat) window.open(externalURL(selected.url), '_blank', 'noopener,noreferrer');
     } else return;
     e.preventDefault();
@@ -587,18 +610,12 @@
         >
       </nav>
       <div class="sidebar-library">
-        <label class="source-filter"
-          ><Search size={14} /><input
-            aria-label="筛选订阅"
-            placeholder="筛选订阅"
-            bind:value={sourceFilter}
-          /></label
-        >
         <div class="category-section">
-          <div class="category-heading">
+          <div class="nav-section-heading">
             <button
               class="section-toggle"
               aria-expanded={categoriesOpen}
+              aria-controls="sidebar-categories"
               onclick={() => {
                 categoriesOpen = !categoriesOpen;
               }}
@@ -611,7 +628,7 @@
               onclick={() => showSettings('categories')}><Settings2 size={14} /></button
             >
           </div>
-          {#if categoriesOpen}<nav aria-label="分类">
+          {#if categoriesOpen}<nav id="sidebar-categories" aria-label="分类">
               {#each categories as category}<button
                   class:chosen={categoryID === category.id}
                   onclick={() => navigate('all', { category: category.id })}
@@ -619,27 +636,42 @@
                 >{/each}
             </nav>{/if}
         </div>
-        <div class="nav-section-label">
-          订阅源 <span>{visibleFeeds.length}</span><button
-            class="icon-button"
-            onclick={() => showSettings()}
-            aria-label="管理订阅"><Settings2 size={14} /></button
+        <div class="nav-section-heading">
+          <button
+            class="section-toggle"
+            aria-expanded={feedsOpen}
+            aria-controls="sidebar-feeds"
+            onclick={() => {
+              feedsOpen = !feedsOpen;
+            }}
+            ><ChevronRight size={13} class={feedsOpen ? 'expanded' : ''} />订阅源<span
+              >{visibleFeeds.length}</span
+            ></button
+          ><button class="icon-button" onclick={() => showSettings()} aria-label="管理订阅"
+            ><Settings2 size={14} /></button
           >
         </div>
-        <nav aria-label="订阅源" class="source-nav">
-          {#each visibleFeeds as feed}<button
-              class:chosen={feedID === feed.id}
-              onclick={() => navigate('all', { feed: feed.id })}
-              title={feed.title}
-              ><FeedIcon {feed} /><span>{feed.title || '未命名订阅'}</span>{#if feed.error}<span
-                  class="health-dot"
-                  title="最近抓取失败"
-                ></span>{/if}</button
-            >{/each}
-          {#if !feeds.length}<button onclick={() => showSettings()}
-              ><Rss size={15} />添加第一个订阅</button
-            >{:else if !visibleFeeds.length}<p class="nav-empty">没有匹配的订阅</p>{/if}
-        </nav>
+        {#if feedsOpen}<label class="source-filter"
+            ><Search size={14} /><input
+              aria-label="筛选订阅"
+              placeholder="筛选订阅"
+              bind:value={sourceFilter}
+            /></label
+          >
+          <nav id="sidebar-feeds" aria-label="订阅源" class="source-nav">
+            {#each visibleFeeds as feed}<button
+                class:chosen={feedID === feed.id}
+                onclick={() => navigate('all', { feed: feed.id })}
+                title={feed.title}
+                ><FeedIcon {feed} /><span>{feed.title || '未命名订阅'}</span>{#if feed.error}<span
+                    class="health-dot"
+                    title="最近抓取失败"
+                  ></span>{/if}</button
+              >{/each}
+            {#if !feeds.length}<button onclick={() => showSettings()}
+                ><Rss size={15} />添加第一个订阅</button
+              >{:else if !visibleFeeds.length}<p class="nav-empty">没有匹配的订阅</p>{/if}
+          </nav>{/if}
       </div>
       <div class="sidebar-bottom">
         <button onclick={() => showSettings()} title="设置与授权" aria-label="设置与授权"
@@ -687,8 +719,8 @@
             <button
               class="icon-button sidebar-toggle"
               onclick={toggleSidebar}
-              aria-label={isMobile ? (navOpen ? '关闭导航' : '打开导航') : '切换侧栏 (Alt+Shift+B)'}
-              title="切换侧栏 (Alt+Shift+B)"
+              aria-label={isMobile ? (navOpen ? '关闭导航' : '打开导航') : '切换侧栏 (c)'}
+              title="切换侧栏 (c)"
               aria-controls="reading-sidebar"
               aria-expanded={isMobile ? navOpen : !sidebarCollapsed}
             >
@@ -708,7 +740,7 @@
               bind:value={searchDraft}
               placeholder="搜索文章、笔记与摘要"
               maxlength="128"
-            /><kbd title="Alt+Shift+F">Alt⇧F</kbd>
+            /><kbd title="搜索文章 (q)">q</kbd>
           </form>
         </header>
         <div class="list-controls">
@@ -877,7 +909,7 @@
           aria-label="关闭快捷键"><X size={19} /></button
         >
       </div>
-      {#each [['Alt+Shift+B', '展开 / 收起侧栏'], ['Alt+Shift+↓ / ↑', '下一篇 / 上一篇或移动列表焦点'], ['Tab / Enter', '聚焦 / 启用按钮或链接'], ['Alt+Shift+R', '切换已读'], ['Alt+Shift+S', '切换收藏'], ['Alt+Shift+O', '打开原文'], ['Alt+Shift+F', '搜索文章'], ['Esc', '返回列表 / 关闭当前面板']] as [key, label]}<div
+      {#each [['c', '展开 / 收起侧栏'], ['↓ / ↑', '下一篇 / 上一篇或移动列表焦点'], ['Tab / Enter', '聚焦 / 启用按钮或链接'], ['a', '切换已读'], ['s', '切换收藏'], ['e', '打开原文'], ['q', '搜索文章'], ['Esc', '返回列表 / 关闭当前面板']] as [key, label]}<div
         >
           <kbd>{key}</kbd><span>{label}</span>
         </div>{/each}

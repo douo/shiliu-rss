@@ -109,8 +109,8 @@
     <button
       onclick={ontogglesidebar}
       class="icon-button sidebar-toggle"
-      aria-label="切换侧栏 (Alt+Shift+B)"
-      title="切换侧栏 (Alt+Shift+B)"
+      aria-label="切换侧栏 (c)"
+      title="切换侧栏 (c)"
       aria-controls="reading-sidebar"
       aria-expanded={isMobile ? navOpen : !sidebarCollapsed}
       >{#if isMobile ? !navOpen : sidebarCollapsed}<PanelLeftOpen size={19} />{:else}<PanelLeftClose
@@ -122,13 +122,13 @@
     ><span class="toolbar-spacer"></span><button
       onclick={() => onmove(-1)}
       class="icon-button"
-      aria-label="上一篇 (Alt+Shift+↑)"
-      title="上一篇 (Alt+Shift+↑)"><ArrowUp size={18} /></button
+      aria-label="上一篇 (↑)"
+      title="上一篇 (↑)"><ArrowUp size={18} /></button
     ><button
       onclick={() => onmove(1)}
       class="icon-button"
-      aria-label="下一篇 (Alt+Shift+↓)"
-      title="下一篇 (Alt+Shift+↓)"><ArrowDown size={18} /></button
+      aria-label="下一篇 (↓)"
+      title="下一篇 (↓)"><ArrowDown size={18} /></button
     ><span class="divider"></span><button
       class:active={article.read_at}
       onclick={() =>
@@ -136,9 +136,8 @@
           error = e.message;
         })}
       class="icon-button"
-      aria-label={article.read_at ? '标为未读 (Alt+Shift+R)' : '标为已读 (Alt+Shift+R)'}
-      title={article.read_at ? '标为未读 (Alt+Shift+R)' : '标为已读 (Alt+Shift+R)'}
-      ><Check size={18} /></button
+      aria-label={article.read_at ? '标为未读 (a)' : '标为已读 (a)'}
+      title={article.read_at ? '标为未读 (a)' : '标为已读 (a)'}><Check size={18} /></button
     ><button
       class:active={article.favorite}
       onclick={() =>
@@ -146,16 +145,16 @@
           error = e.message;
         })}
       class="icon-button"
-      aria-label={article.favorite ? '取消收藏 (Alt+Shift+S)' : '收藏文章 (Alt+Shift+S)'}
-      title={article.favorite ? '取消收藏 (Alt+Shift+S)' : '收藏文章 (Alt+Shift+S)'}
+      aria-label={article.favorite ? '取消收藏 (s)' : '收藏文章 (s)'}
+      title={article.favorite ? '取消收藏 (s)' : '收藏文章 (s)'}
       ><Star size={18} fill={article.favorite ? 'currentColor' : 'none'} /></button
     ><a
       href={externalURL(article.url)}
       target="_blank"
       rel="noopener noreferrer"
       class="icon-button"
-      aria-label="打开原文 (Alt+Shift+O)"
-      title="打开原文 (Alt+Shift+O)"><ExternalLink size={18} /></a
+      aria-label="打开原文 (e)"
+      title="打开原文 (e)"><ExternalLink size={18} /></a
     >
   </div>
   <div class="reading-content">
