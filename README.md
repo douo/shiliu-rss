@@ -1,73 +1,208 @@
+<div align="center">
+
+<img src="assets/icon.svg" alt="Shiliu RSS Logo" width="80" height="80" />
+
 # 拾流 RSS · Shiliu
 
-自托管的个人 RSS 阅读器，支持后台更新、按源保存、晨报与对话式 Agent。Go + SQLite 单进程，Svelte 5 / TypeScript / SvelteKit 静态前端，Tailwind CSS 4。图标为[抽象石榴 SVG](assets/icon.svg)。
+**A lightweight, self-hosted personal RSS reader with intelligent morning briefings and a conversational AI assistant.**
 
-首页提供每日未读晨报，也可按订阅源、分类、收藏和归档阅读文章。支持从 Miniflux 迁移订阅、文章与阅读状态。功能验收与已知限制见[实施记录](docs/implementation.md)。
+Built as an efficient single-process application with Go and SQLite, paired with a modern Svelte 5 frontend. Designed to run smoothly on homeservers and low-power NAS devices with a minimal resource footprint.
 
-## 本机启动
+<p align="center">
+  <strong>English</strong> •
+  <a href="README_zh.md">简体中文</a>
+</p>
 
-需要支持自动工具链的 Go、pnpm 11.0.9。项目固定 Go 1.27.2、Node 24.22.0；pnpm 下载项目运行时，不替换全局 Node。
+<p align="center">
+  <img src="assets/screenshots/morning-brief.png" alt="Shiliu RSS Morning Briefing and Conversational AI Assistant" width="100%" />
+</p>
 
-```sh
-make setup
-make init    # 仅首次初始化，不覆盖已有账号
-make dev
+</div>
+
+---
+
+## Highlights
+
+- **⚡ Lightweight Single-Binary Architecture**: Pure Go backend embedding a pre-compiled Svelte 5 static single-page application (SPA). Zero external runtime dependencies—no Node.js or separate database servers needed in production.
+- **☀️ Daily Morning Briefings**: Automated daily executive digests summarizing unread feeds by category, source, and importance. Inline citations allow seamless one-click jumps directly to source articles, with full reading position retention.
+- **🤖 Built-in Conversational AI Agent**: Chat with your feeds and morning briefings using a bounded lexical RAG engine. Native compatibility with standard OpenAI API / Chat Completions protocols. Features strict token budgets, scheduled windows, and zero overhead when disabled.
+- **📖 Focused Reading Experience**: Distraction-free typography with responsive dark/light theme matching, fluid navigation, and full keyboard shortcuts designed to avoid conflicts with tools like Vimium.
+- **🔄 Reliable Feed Synchronization**: Full support for RSS 2.0, Atom, and JSON Feed. Implements HTTP conditional requests (`ETag`, `Last-Modified`), jittered intervals, exponential backoff, and persistent background job queues with crash recovery.
+- **🧹 Granular Data Retention**: Customizable retention policies per subscription. Automatically clean up older article bodies (e.g., 90-day retention) while keeping metadata, notes, and starred entries intact indefinitely.
+- **🔍 Full-Text Search & Extraction**: Integrated one-click readability parser and server-side HTML sanitization. Embedded SQLite FTS5 full-text search with CJK tokenization support.
+- **🚚 Frictionless Migration**: Lossless import from Miniflux (feeds, categories, read states, and bookmarks) and standard OPML import/export.
+
+---
+
+## Interface Preview
+
+<div align="center">
+
+### Focused Article Reading View
+<img src="assets/screenshots/reading-view.png" alt="Distraction-Free Article Reading View" width="100%" />
+
+### Stream & Feed Management
+<img src="assets/screenshots/article-list.png" alt="Organized Article Stream & Feed Management" width="100%" />
+
+</div>
+
+---
+
+## Tech Stack
+
+| Layer | Technologies | Purpose |
+|---|---|---|
+| **Backend & HTTP** | Go (standard library `net/http`) | Clean concurrency, low memory footprint, and straightforward cross-compilation |
+| **Database** | SQLite WAL (`modernc.org/sqlite`, `goose`) | Pure Go driver without CGO dependencies; transactional schema migrations |
+| **Search Engine** | SQLite FTS5 | In-database CJK tokenization and phrase searching; transactional consistency |
+| **Frontend** | Svelte 5, SvelteKit, TypeScript | Reactive, component-driven UI compiled to static assets and embedded via `go:embed` |
+| **Styling & UI** | Tailwind CSS 4, Lucide Icons | Responsive layout, modern aesthetic, and fluid reading interactions |
+| **API Contract** | OpenAPI 3.1.0 (`oapi-codegen`, `openapi-fetch`) | Single source of truth generating both Go handlers and TypeScript API clients |
+| **Parsing & Cleanup** | `gofeed`, `go-readability`, `bluemonday` | Safe feed parsing and strict server-side HTML sanitization |
+
+---
+
+## Quick Start (Local Development)
+
+### Prerequisites
+
+- **Go**: 1.27+
+- **pnpm**: 11.0.9+ (Node.js runtime is managed locally by pnpm)
+
+### Setup & Run
+
+1. **Install dependencies and test browsers**:
+   ```sh
+   make setup
+   ```
+
+2. **Initialize local database & credentials** (first run only):
+   ```sh
+   make init
+   ```
+   > An initial administrative password will be generated into `.local/admin-password`. No username is required for login.
+
+3. **Start local development servers**:
+   ```sh
+   make dev
+   ```
+   - Web UI: **http://127.0.0.1:41002** (Vite dev server with hot reload)
+   - API Server: **http://127.0.0.1:41001**
+   - Port configurations are stored in `config/dev.env`.
+
+4. **Run the embedded single binary**:
+   To test the production-style single binary locally:
+   ```sh
+   make run
+   # Open http://127.0.0.1:41001
+   ```
+
+---
+
+## Production Deployment
+
+Shiliu RSS is optimized for deployment as a single container via **Docker Compose** behind a reverse proxy (such as Nginx, Caddy, or Traefik) providing HTTPS.
+
+### 1. Docker Compose Example
+
+```yaml
+# deploy/compose.yaml
+name: shiliu-rss
+
+services:
+  reader:
+    image: ${SHILIU_IMAGE}
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./data:/data
+      - ./backup:/backup
+    environment:
+      SHILIU_ADDR: ":8080"
+      SHILIU_DB: /data/reader.db
+      SHILIU_ORIGIN: "https://reader.example.com"
+      SHILIU_COOKIE_SECURE: "true"
+      SHILIU_BACKUP_DIR: /backup
+    tmpfs:
+      - /tmp:size=16m,noexec,nosuid,nodev,mode=1777
+    healthcheck:
+      test: ["CMD", "/reader", "healthcheck"]
+      interval: 60s
+      timeout: 6s
+      retries: 3
 ```
 
-打开 **http://127.0.0.1:41002**。登录无需用户名；随机初始密码在 `.local/admin-password`，文件仅本机用户可读。开发库为 `.local/reader.db`。
+### 2. Initialization & Secrets
 
-固定开发端口为 API `41001` / Vite `41002`，保存在 [config/dev.env](config/dev.env)。换用端口时同时更新该文件并核对占用；启动不会自动重新分配。部署配置独立于开发配置。
-
-运行嵌入前端的单进程成品（与 dev 二选一）：
+Initialize the admin account using a secure password file without exposing plaintext credentials in shell history:
 
 ```sh
-make run
+docker compose run --rm --no-deps -T \
+  -v /path/to/password-file:/run/secrets/password:ro \
+  -e SHILIU_PASSWORD_FILE=/run/secrets/password reader init
 ```
 
-打开 **http://127.0.0.1:41001**。本机 HTTP 使用非 Secure cookie；正式服务使用 HTTPS、准确的 `SHILIU_ORIGIN` 和 `SHILIU_COOKIE_SECURE=true`。
+For complete instructions on Nginx TLS configuration, automated database backups, systemd units, and zero-downtime updates, please refer to the [Production Deployment Guide](docs/production.md).
 
-## 阅读与整理
+---
 
-- RSS / Atom / JSON Feed、分类、OPML；默认每 5 小时检查并加入抖动，支持条件请求、退避、持久任务和重启续作。
-- 首页晨报，近期、收藏、归档与搜索共用侧栏。文章按发布时间倒序；分类可展开源，源显示全量未读及异常详情。源/分类列表顶部可查看详情并直接编辑。
-- 列表未读标签按完整筛选范围统计，不受分页或阅读标签影响。“本页标为已读”仅操作已加载条目；晨报末尾可标读该报告已实际总结的文章。
-- 正文、笔记、标签和 Agent 摘要分别保留。普通正文 90 天清理，收藏/长期源豁免；迁入正文有 30 天保护。日常隐藏不等于已读或删除。
-- 显式全文获取、危险 HTML 清理、出站地址检查、严格脚本 CSP、gzip 静态资源。
-- 可撤销 API token、分页与 changes 增量、幂等写回及版本/内容依据冲突检查。
+## Keyboard Shortcuts
 
-桌面快捷键：`↑/↓` 导航，`c` 侧栏，`a` 已读，`s` 收藏，`e` 原文，`q` 搜索，`Esc` 返回。分配避让 Vimium 默认映射；输入、弹窗和表单内保留原生操作，自定义扩展映射仍可能冲突。
+Designed for high-efficiency reading, keyboard navigation avoids conflicts with common browser extensions such as Vimium:
 
-## Agent
+| Key | Description |
+|:---:|---|
+| `↑` / `↓` | Navigate feed list / Previous & Next article in reader view |
+| `c` | Toggle sidebar navigation |
+| `a` | Toggle read / unread status |
+| `s` | Star / bookmark article |
+| `e` | Open original article in a new tab |
+| `q` | Focus search bar |
+| `Esc` | Close modal / return to feed list / dismiss overlays |
 
-在「设置 → Agent 配置」填写 Base URL、协议、模型和 API Key，再启用。未配置时停用。支持 OpenAI 兼容 Responses / Chat Completions；Key 只写不回显，留空保留，也可从 `SHILIU_AGENT_API_KEY_FILE` 指定的受保护文件读取。
+---
 
-默认每天 Asia/Shanghai 08:00 汇总全部未读（含归档）。重要源按全文处理并按策略补抓，普通/次要源有界截取；按分类、来源、重要度和未读量聚合，引用打开系统内部文章。返回正文前的晨报位置，或在右侧/底部围绕报告提问。
+## AI Agent Integration
 
-日 token/调用预算、运行窗口及续作可配置。缺文、格式失败和预算不足明确显示覆盖缺口。对话使用有界词法 RAG；尚无语义向量、重排或任意工具执行器。外部系统可使用同一[Agent API](docs/agent-api.md)。
+Configure your preferred LLM in **Settings → Agent Configuration**:
 
-## 验证与构建
+- **Protocols**: Supports OpenAI-compatible endpoints (Chat Completions / Responses).
+- **Security**: API keys are write-only in the UI and never exposed back to the client. You can also specify keys via a protected file (`SHILIU_AGENT_API_KEY_FILE`).
+- **Morning Briefing**: Defaults to a daily summary (e.g. 08:00 Asia/Shanghai) analyzing unread content across feeds.
+- **Bounded Resources**: Strictly enforce daily token limits, execution time windows, and concurrency budgets. Unconfigured agents remain completely inert with zero background overhead.
+
+---
+
+## Verification & Testing
 
 ```sh
-make check-generated  # OpenAPI → Go / TypeScript 生成漂移
-make check            # go vet + Svelte / TypeScript
-make test             # Go race 与集成测试
-make test-web         # 先停 dev/run；隔离库运行 60 项浏览器检查
-make build-linux      # 本机静态交叉编译 Linux AMD64 v1
-./scripts/check-privacy --history
+make check-generated  # Check OpenAPI schema drift for Go & TypeScript
+make check            # Run go vet & Svelte / TypeScript type-checks
+make test             # Run Go unit & integration tests with -race
+make test-web         # Execute Playwright E2E browser test suite
+make build-linux      # Cross-compile release binaries for Linux AMD64
 ```
 
-PostgreSQL 一致快照测试需要本机 PostgreSQL CLI；缺少时明确跳过该项，不算完整迁移验收。Linux 镜像运行检查和部署步骤见[操作说明](docs/operations.md)。合成规模数据见 [scale.json](docs/validation/scale.json)，不能用来宣称目标设备的性能或功耗达标。
+---
 
-## 文档与部署
+## Documentation
 
-从[文档索引](docs/README.md)按角色阅读：
+Detailed technical and operational documentation is available in the [`docs/`](docs/) directory:
 
-| 内容 | 入口 |
+| Document | Focus Area |
 |---|---|
-| 产品范围与验收场景 | [产品需求](docs/product.md)、[实施记录](docs/implementation.md) |
-| 技术、架构与决策 | [技术选型](docs/technology.md)、[架构](docs/architecture.md)、[决策](docs/decisions.md) |
-| Agent 设计与契约 | [系统设计](docs/agent-design.md)、[提示词](docs/agent-prompts.md)、[API](docs/agent-api.md)、[OpenAPI](api/openapi.yaml) |
-| 开发、迁移与运维 | [前端说明](web/README.md)、[操作说明](docs/operations.md)、[部署指南](docs/production.md) |
-| 凭据、备份与敏感数据 | [安全说明](docs/security.md) |
-
-使用 [Docker Compose 模板](deploy/compose.yaml)部署，配置镜像版本、HTTPS 地址、主机端口和备份目录。初始化、反向代理、升级与回退步骤见[部署指南](docs/production.md)。
+| [Documentation Index](docs/README.md) | Map of all documentation resources and reading paths |
+| [Product Requirements](docs/product.md) | Product scope, functional requirements, and acceptance criteria |
+| [Architecture](docs/architecture.md) | Modular design, lifecycle rules, transactions, and storage |
+| [Technology Decisions](docs/technology.md) | Tech stack evaluation, rationale, and engineering constraints |
+| [Implementation Log](docs/implementation.md) | Validation status, test evidence, and engineering metrics |
+| [Agent Design](docs/agent-design.md) | Morning briefs, RAG design, citations, and conversation flows |
+| [Agent API](docs/agent-api.md) | Shared HTTP API contract for both web client and external agents |
+| [Operations Guide](docs/operations.md) | Backup, restore, and Miniflux migration procedures |
+| [Production Deployment](docs/production.md) | Container setup, TLS reverse proxy, and maintenance runbooks |
+| [Security Policy](docs/security.md) | Secrets management, input sanitization, and data isolation |

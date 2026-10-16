@@ -1,10 +1,10 @@
 # 文档索引
 
-文档按使用、开发和维护场景组织。首次使用从[项目 README](../README.md)开始。
+文档按使用、开发和维护场景组织。首次使用从[项目 README](../README.md)（[中文文档](../README_zh.md)）开始。
 
 | 阅读目标 | 文档 | 维护边界 |
 |---|---|---|
-| 启动与功能概览 | [根 README](../README.md) | 可直接复现的本机入口、当前功能 |
+| 启动与功能概览 | [根 README](../README.md) / [中文](../README_zh.md) | 可直接复现的本机入口、当前功能 |
 | 需求与验收场景 | [product.md](product.md) | R-01–R-29、A01–A19；需求不等于全部质量目标已达成 |
 | 完成情况与实际证据 | [implementation.md](implementation.md) | 最新检查、已实现机制、未完成的质量/性能验证 |
 | 技术与版本 | [technology.md](technology.md) | 选择理由、固定工具链、工程预算 |
