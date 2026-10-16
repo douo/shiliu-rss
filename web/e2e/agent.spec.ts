@@ -187,7 +187,14 @@ test('morning report is home, citations return to their place, and mark-read cov
     updated_at: now,
     due_at: now,
     result: {
-      blocks: [],
+      blocks: [
+        {
+          kind: 'limitation',
+          text: '本报告存在缺文或未完成处理，请结合覆盖统计与文章卡片阅读。',
+          evidence_ids: [],
+          citations: []
+        }
+      ],
       groups: [
         {
           id: 'source',
@@ -241,13 +248,56 @@ test('morning report is home, citations return to their place, and mark-read cov
     artifacts: []
   };
   let marked = 0;
+  let reportConversations: AgentConversation[] = [];
+  let reportMessages: AgentMessage[] = [];
+  const reply = {
+    ...report,
+    id: '11',
+    kind: 'chat',
+    state: 'complete',
+    conversation_id: 'c7',
+    result: {
+      ...report.result,
+      blocks: [{ kind: 'fact', text: '本报告主要讨论增量索引。', evidence_ids: [], citations: [] }]
+    }
+  };
   await page.route('**/api/v1/**', async (route) => {
     const req = route.request(),
       path = new URL(req.url()).pathname;
     let body: unknown;
     if (path === '/api/v1/session') body = { authenticated: true, csrf_token: 'synthetic' };
-    else if (['/api/v1/feeds', '/api/v1/categories', '/api/v1/agent/conversations'].includes(path))
-      body = [];
+    else if (['/api/v1/feeds', '/api/v1/categories'].includes(path)) body = [];
+    else if (path === '/api/v1/agent/conversations') {
+      if (req.method() === 'POST') {
+        expect(req.postDataJSON().report_id).toBe('7');
+        const c = { id: 'c7', title: '晨报对话', report_id: '7', created_at: now, updated_at: now };
+        reportConversations = [c];
+        body = c;
+      } else body = reportConversations;
+    } else if (path === '/api/v1/agent/conversations/c7/messages') {
+      if (req.method() === 'POST') {
+        expect(req.postDataJSON().text).toBe('本报告主要讨论什么？');
+        reportMessages = [
+          {
+            id: 'm1',
+            role: 'user',
+            text: req.postDataJSON().text,
+            result: { ...report.result, blocks: [] },
+            run_id: '11',
+            created_at: now
+          },
+          {
+            id: 'm2',
+            role: 'assistant',
+            text: '',
+            result: reply.result,
+            run_id: '11',
+            created_at: now
+          }
+        ];
+        body = reply;
+      } else body = reportMessages;
+    } else if (path === '/api/v1/agent/runs/11') body = reply;
     else if (path === '/api/v1/agent/settings') body = { enabled: true };
     else if (path === '/api/v1/agent/runs') body = [report];
     else if (path === '/api/v1/agent/runs/7') body = report;
@@ -276,6 +326,64 @@ test('morning report is home, citations return to their place, and mark-read cov
   const nav = page.getByRole('navigation', { name: '阅读导航', exact: true });
   await expect(nav.getByRole('button').first()).toHaveText('晨报 · Agent');
   if (info.project.name === 'mobile') await page.keyboard.press('Escape');
+  // Detailed limitations stay out of the reading flow and work with hover, touch and keyboard.
+  const diagnostic = page.getByRole('button', { name: '覆盖与处理说明', exact: true });
+  const technical = page.getByRole('dialog', { name: '处理限制与技术报告', exact: true });
+  await expect(technical).not.toBeVisible();
+  if (info.project.name === 'mobile') await diagnostic.click();
+  else await diagnostic.hover();
+  await expect(technical).toBeVisible();
+  await expect(technical).toContainText('没有记录具体失败码');
+  await expect(technical).toContainText('65 / 65 篇');
+  await expect(technical).toContainText('卡片是派生摘要');
+  await page.screenshot({ path: `test-results/${info.project.name}-report-diagnostics.png` });
+  const panelBounds = await technical.boundingBox();
+  expect(panelBounds!.x).toBeGreaterThanOrEqual(0);
+  expect(panelBounds!.x + panelBounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await technical.getByRole('button', { name: '关闭技术说明', exact: true }).click();
+  await expect(technical).not.toBeVisible();
+  await page.mouse.move(0, 0);
+  await page.getByRole('button', { name: '围绕报告提问', exact: true }).focus();
+  await diagnostic.focus();
+  await expect(technical).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(technical).not.toBeVisible();
+
+  const footer = page.getByRole('group', { name: '晨报末尾操作' });
+  expect(
+    await footer.evaluate(
+      (el) =>
+        el.getBoundingClientRect().top >
+        document.querySelector('.source-group')!.getBoundingClientRect().bottom
+    )
+  ).toBe(true);
+  // Ask in place, preserve the report and URL, and reuse the report conversation after reopening.
+  const beforeURL = page.url();
+  await page.getByRole('button', { name: '围绕报告提问', exact: true }).click();
+  const chat = page.getByRole('complementary', { name: '围绕晨报提问', exact: true });
+  await expect(chat).toBeVisible();
+  await expect(chat.getByLabel('向阅读助理提问')).toBeFocused();
+  await expect(page.getByRole('heading', { name: '未读晨报', exact: true })).toBeVisible();
+  expect(page.url()).toBe(beforeURL);
+  const bounds = await chat.boundingBox();
+  if (info.project.name === 'mobile') expect(bounds!.y).toBeGreaterThan(0);
+  else expect(bounds!.x).toBeGreaterThan(page.viewportSize()!.width / 2);
+  await chat.getByLabel('向阅读助理提问').fill('本报告主要讨论什么？');
+  await chat.getByRole('button', { name: '发送', exact: true }).click();
+  await expect(chat.getByText('本报告主要讨论增量索引。', { exact: true })).toBeVisible();
+  await page.screenshot({ path: `test-results/${info.project.name}-report-chat.png` });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: `test-results/${info.project.name}-report-chat-dark.png` });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.keyboard.press('Escape');
+  await expect(chat).not.toBeVisible();
+  await expect(page.getByRole('button', { name: '围绕报告提问', exact: true })).toBeFocused();
+  await page.getByRole('button', { name: '围绕报告提问', exact: true }).click();
+  await expect(chat.getByText('本报告主要讨论增量索引。', { exact: true })).toBeVisible();
+  expect(reportConversations).toHaveLength(1);
+  await chat.getByRole('button', { name: '关闭报告提问', exact: true }).click();
+  expect(page.url()).toBe(beforeURL);
+
   const citation = page.getByRole('link', { name: '引用文章 35', exact: true });
   await citation.scrollIntoViewIfNeeded();
   const position = await page.locator('.agent-host').evaluate((el) => el.scrollTop);
@@ -302,6 +410,12 @@ test('morning report is home, citations return to their place, and mark-read cov
   await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
   await page.goBack();
   await expect(citation).toBeInViewport();
+  const readScope = page.getByRole('button', { name: '已读范围与技术说明', exact: true });
+  await readScope.scrollIntoViewIfNeeded();
+  await readScope.click();
+  const scopePanel = page.getByRole('dialog', { name: '总结文章批量已读 · 执行范围', exact: true });
+  await expect(scopePanel).toContainText('当前符合条件且仍未读：64 篇');
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: /总结文章标为已读/ }).click();
   await expect(
     page.getByRole('status').filter({ hasText: '已将 64 篇总结文章标为已读' })

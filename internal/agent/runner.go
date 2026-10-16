@@ -96,14 +96,7 @@ func (r *Runner) Tick(ctx context.Context) error {
 		delay := max(p.RetryAfter, 15*time.Second)
 		return r.App.SetAgentRunState(ctx, run, "waiting_retry", p.Code, r.App.Now().Add(delay), nil)
 	}
-	reason := "agent_processing_failed"
-	if errors.Is(e, app.ErrAgentBudget) {
-		reason = "daily_budget_exhausted"
-	} else if errors.Is(e, ErrFormat) {
-		reason = "invalid_model_output"
-	} else if errors.As(e, &p) {
-		reason = p.Code
-	}
+	reason := failureCode(e)
 	if run.Kind == "report" {
 		result, fe := r.finalize(ctx, run, v, false)
 		if fe == nil {
@@ -112,6 +105,21 @@ func (r *Runner) Tick(ctx context.Context) error {
 	}
 	result := app.AgentResult{Blocks: []app.AgentBlock{{Kind: "limitation", Text: "处理未完成：" + reason, Citations: []app.AgentCitation{}, EvidenceIDs: []string{}}}, Groups: []app.AgentGroup{}, Counts: map[string]int{}, Trace: []string{}, Degraded: true}
 	return r.App.SetAgentRunState(ctx, run, "failed", reason, r.App.Now(), &result)
+}
+
+// Keep diagnostics limited to stable codes; provider payloads and article text are private.
+func failureCode(e error) string {
+	var p *ProviderError
+	switch {
+	case errors.Is(e, app.ErrAgentBudget):
+		return "daily_budget_exhausted"
+	case errors.Is(e, ErrFormat):
+		return "invalid_model_output"
+	case errors.As(e, &p):
+		return p.Code
+	default:
+		return "agent_processing_failed"
+	}
 }
 
 // Inputs remain transient. Only validated derived outputs are cached.
@@ -459,7 +467,11 @@ func (r *Runner) finalize(ctx context.Context, run app.AgentRun, v app.AgentSett
 		return app.AgentResult{}, e
 	}
 	res := app.AgentResult{Groups: groups, Counts: counts, Blocks: []app.AgentBlock{}, Trace: []string{"完整未读快照（含归档）；不更改已读状态"}, Degraded: counts["pending"]+counts["fallback"]+counts["unavailable"] > 0}
+	if !model {
+		res.Trace = append(res.Trace, "来源聚合未调用模型；展示已保存的文章卡片，原因见任务错误码")
+	}
 	for i, g := range groups {
+		truncated := false
 		after := ""
 		summaries := []app.AgentBlock{}
 		for {
@@ -483,7 +495,7 @@ func (r *Runner) finalize(ctx context.Context, run app.AgentRun, v app.AgentSett
 					if e != nil {
 						model = false
 						res.Degraded = true
-						res.Trace = append(res.Trace, "聚合未完成，展示已完成的文章卡片")
+						res.Trace = append(res.Trace, fmt.Sprintf("来源 #%s · 分批聚合失败：%s；后续聚合停用，保留已保存的文章卡片", g.ID, failureCode(e)))
 						if errors.Is(e, app.ErrLease) {
 							return res, e
 						}
@@ -498,6 +510,7 @@ func (r *Runner) finalize(ctx context.Context, run app.AgentRun, v app.AgentSett
 				}
 				summaries = append(summaries, bs...)
 				if !model && len(summaries) > 8 {
+					truncated = true
 					summaries = summaries[:8]
 				}
 			}
@@ -522,8 +535,12 @@ func (r *Runner) finalize(ctx context.Context, run app.AgentRun, v app.AgentSett
 				}
 				out, e := r.narrative(ctx, run, v, narrativePrompt, ev, map[string]string{"group": g.Title, "instruction": "聚合为最多两个主题块。"})
 				if e != nil {
+					if errors.Is(e, app.ErrLease) {
+						return res, e
+					}
 					model = false
 					res.Degraded = true
+					res.Trace = append(res.Trace, fmt.Sprintf("来源 #%s · 层次归并失败：%s；后续聚合停用，保留已保存的文章卡片", g.ID, failureCode(e)))
 					break
 				}
 
@@ -534,7 +551,11 @@ func (r *Runner) finalize(ctx context.Context, run app.AgentRun, v app.AgentSett
 			}
 		}
 		if len(summaries) > 8 {
+			truncated = true
 			summaries = summaries[:8]
+		}
+		if truncated {
+			res.Trace = append(res.Trace, fmt.Sprintf("来源 #%s · 展示截断为前8个块；单篇已保存摘要保留在文章与覆盖明细", g.ID))
 			summaries = append(summaries, app.AgentBlock{Kind: "limitation", Text: "聚合处理未完成；完整文章卡片可在成员列表查看。", Citations: []app.AgentCitation{}, EvidenceIDs: []string{}})
 		}
 		res.Groups[i].Blocks = summaries

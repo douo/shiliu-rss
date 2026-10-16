@@ -383,3 +383,93 @@ func TestMalformedArticleDoesNotStopOtherReportMembers(t *testing.T) {
 		}
 	}
 }
+
+func TestAggregationFailureRetainsSafeDiagnosticsAndMemberCards(t *testing.T) {
+	for _, stage := range []string{"分批聚合", "层次归并"} {
+		t.Run(stage, func(t *testing.T) {
+			aggregations := 0
+			provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var req struct {
+					Input string `json:"input"`
+				}
+				if e := json.NewDecoder(r.Body).Decode(&req); e != nil {
+					t.Error(e)
+					return
+				}
+				var input struct {
+					Articles []struct {
+						ID string `json:"article_id"`
+					} `json:"articles"`
+					Evidence []Evidence `json:"evidence"`
+				}
+				if e := json.Unmarshal([]byte(req.Input), &input); e != nil {
+					t.Error(e)
+					return
+				}
+				var output any
+				if len(input.Articles) > 0 {
+					cards := []ArticleCard{}
+					for _, a := range input.Articles {
+						refs := []string{}
+						for _, evidence := range input.Evidence {
+							if evidence.ArticleID == a.ID {
+								refs = append(refs, evidence.ID)
+							}
+						}
+						cards = append(cards, ArticleCard{ArticleID: a.ID, Status: "ok", Points: []ArticlePoint{{Text: "合成文章摘要", EvidenceIDs: refs}}})
+					}
+					output = Batch{Version: "1", Articles: cards}
+				} else {
+					aggregations++
+					if stage == "分批聚合" || aggregations > 5 {
+						json.NewEncoder(w).Encode(map[string]any{"output_text": "private-provider-payload-invalid", "usage": map[string]int{"total_tokens": 10}})
+						return
+					}
+					refs := []string{}
+					for _, evidence := range input.Evidence {
+						refs = append(refs, evidence.ID)
+					}
+					output = Narrative{Version: "1", Blocks: []Point{{Kind: "fact", Text: "合成主题一", EvidenceIDs: refs}, {Kind: "analysis", Text: "合成主题二", EvidenceIDs: refs}}}
+				}
+				b, _ := json.Marshal(output)
+				json.NewEncoder(w).Encode(map[string]any{"output_text": string(b), "usage": map[string]int{"total_tokens": 10}})
+			}))
+			defer provider.Close()
+			r, s := fixture(t, provider.URL)
+			ctx := context.Background()
+			feed, e := s.CreateFeed(ctx, app.Feed{URL: "https://example.invalid/aggregation", Paused: true})
+			if e != nil {
+				t.Fatal(e)
+			}
+			entries := []app.FeedEntry{}
+			for i := 0; i < 15; i++ {
+				entries = append(entries, app.FeedEntry{GUID: fmt.Sprint(i), Title: fmt.Sprintf("合成文章%d", i), Text: "合成内容"})
+			}
+			if _, e = s.IngestFeed(ctx, feed.ID, entries); e != nil {
+				t.Fatal(e)
+			}
+			run, e := s.QueueAgentRun(ctx, "report", "{}", "")
+			if e != nil {
+				t.Fatal(e)
+			}
+			done := drain(t, r, run.ID)
+			trace := strings.Join(done.Result.Trace, "\n")
+			if done.State != "partial" || done.Completed != 15 || !strings.Contains(trace, stage+"失败：invalid_model_output") || strings.Contains(trace, "private-provider") {
+				t.Fatalf("missing or unsafe diagnostics: state=%s completed=%d trace=%s", done.State, done.Completed, trace)
+			}
+			blocks := done.Result.Groups[0].Blocks
+			if len(blocks) != 9 || blocks[8].Kind != "limitation" || !strings.Contains(trace, "展示截断") {
+				t.Fatalf("silent truncation: %+v %s", blocks, trace)
+			}
+			members, e := s.AgentMembers(ctx, run.ID, "", "", 50, false)
+			if e != nil || len(members) != 15 {
+				t.Fatal("member cards lost", e)
+			}
+			for _, member := range members {
+				if len(member.Card) == 0 || member.State != "summarized" {
+					t.Fatal("summary lost", member.ArticleID)
+				}
+			}
+		})
+	}
+}

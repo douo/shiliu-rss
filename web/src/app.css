@@ -15,9 +15,9 @@
   --surface: #f5f7f4;
   --sidebar: #f5f7f4;
   --text: #303633;
-  --muted: #858b86;
+  --muted: #68746c;
   --line: #e8ece7;
-  --accent: #527961;
+  --accent: #466f55;
   --accent-soft: #e8efe8;
   --danger: #a6404b;
   color-scheme: light dark;
@@ -193,6 +193,7 @@ small {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .keycap,
 kbd {
@@ -325,7 +326,7 @@ kbd {
   min-width: 0;
   width: 100%;
   padding: 7px 0;
-  font-size: 11px;
+  font-size: 12px;
   background: transparent;
   border: 0;
   box-shadow: none;
@@ -342,7 +343,7 @@ kbd {
   padding: 9px 7px;
   text-align: left;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 .section-toggle span {
   margin-left: auto;
@@ -465,7 +466,7 @@ kbd {
 }
 .article-count {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   align-self: flex-end;
   padding-bottom: 3px;
@@ -486,7 +487,7 @@ kbd {
   background: none;
   border: none;
   padding: 10px 0;
-  font-size: 11px;
+  font-size: 12px;
   min-width: 0;
   outline: none;
 }
@@ -496,7 +497,7 @@ kbd {
   background: none;
 }
 .list-controls {
-  margin: 0 47px;
+  margin: 0 36px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -542,10 +543,10 @@ kbd {
   height: 28px;
 }
 .list-actions .text-button {
-  font-size: 11px;
+  font-size: 12px;
 }
 .article-list {
-  padding: 0 47px;
+  padding: 0 36px;
   overflow: auto;
   flex: 1;
   scroll-behavior: auto;
@@ -589,7 +590,7 @@ kbd {
 .article-source {
   flex-wrap: wrap;
   overflow-wrap: anywhere;
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   display: flex;
   align-items: center;
@@ -599,10 +600,10 @@ kbd {
   line-height: 1.5;
 }
 .article-source > span:not(.body-badge) {
-  opacity: 0.5;
+  opacity: 1;
 }
 .article-source time {
-  font-size: 10px;
+  font-size: 12px;
 }
 .article-row h2 {
   font-size: 15px;
@@ -613,7 +614,7 @@ kbd {
 }
 .article-row.is-read h2 {
   font-weight: 400;
-  color: #8d948e;
+  color: var(--muted);
 }
 .article-row.is-read .article-source {
   opacity: 0.8;
@@ -632,7 +633,7 @@ kbd {
   flex-shrink: 0;
 }
 .body-badge {
-  font-size: 9px;
+  font-size: 12px;
   border: 1px solid var(--line);
   padding: 0 4px;
   border-radius: 3px;
@@ -641,11 +642,11 @@ kbd {
   display: flex;
   gap: 8px;
   margin-top: 7px;
-  color: #9ba396;
-  font-size: 10px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .global-error {
-  margin: 15px 47px;
+  margin: 15px 36px;
 }
 .empty-state {
   max-width: 380px;
@@ -692,7 +693,7 @@ kbd {
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
-  padding: 17px 47px 0;
+  padding: 17px 36px 0;
   color: var(--muted);
   font-size: 11px;
 }
@@ -766,7 +767,7 @@ kbd {
   gap: 16px;
   flex-wrap: wrap;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 12px;
   margin: 24px 0 34px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--line);
@@ -999,7 +1000,7 @@ kbd {
 }
 .feed-setting-info p,
 .feed-setting-info small {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.7;
   margin-top: 6px;
@@ -1058,7 +1059,7 @@ kbd {
 }
 .token-row p,
 .token-row small {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-top: 7px;
   overflow-wrap: anywhere;
@@ -1137,14 +1138,14 @@ kbd {
   margin-top: 20px;
 }
 .policy-grid label {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
 }
 .policy-grid input {
   margin-top: 8px;
 }
 .form-help {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   line-height: 1.8;
   margin-top: 17px;
@@ -1194,7 +1195,7 @@ kbd {
 }
 .login-card > label {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 9px;
 }
@@ -1338,7 +1339,7 @@ kbd {
     line-height: 1.75;
   }
   .article-source {
-    font-size: 10px;
+    font-size: 12px;
   }
   .row-chevron {
     display: none;
@@ -1465,7 +1466,7 @@ kbd {
     --surface: #232a25;
     --sidebar: #202722;
     --text: #dce2dc;
-    --muted: #8a968d;
+    --muted: #a6b3a9;
     --line: #303a32;
     --accent: #91b99b;
     --accent-soft: #2b3a2f;
@@ -1481,7 +1482,7 @@ kbd {
     color: #18281c;
   }
   .article-row.is-read h2 {
-    color: #839086;
+    color: var(--muted);
   }
   .login-page {
     background: radial-gradient(ellipse at 25% 15%, #2b3a2e 0, transparent 50%), #1b201d;
@@ -1501,5 +1502,13 @@ kbd {
   *:after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+@media (pointer: coarse) {
+  input:not([type='checkbox']),
+  textarea,
+  select {
+    font-size: 16px;
   }
 }
