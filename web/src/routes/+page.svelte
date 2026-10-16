@@ -17,6 +17,7 @@
     LoaderCircle,
     Keyboard,
     RefreshCw,
+    Info,
     PanelLeftClose,
     PanelLeftOpen
   } from '@lucide/svelte';
@@ -24,6 +25,7 @@
   import AgentWorkspace from '../lib/AgentWorkspace.svelte';
   import FeedIcon from '../lib/FeedIcon.svelte';
   import SidebarFeed from '../lib/SidebarFeed.svelte';
+  import ListDetails from '../lib/ListDetails.svelte';
   import { modal } from '../lib/modal';
   import { api, APIError } from '../lib/api';
   import type { Article, ArticlePatch, Feed, Category } from '../lib/models';
@@ -74,6 +76,15 @@
     unfavoriteTarget = $state<Article | null>(null);
   let listElement = $state<HTMLDivElement>(),
     searchElement = $state<HTMLInputElement>();
+  let detailsOpen = $state(false);
+  let settingsWorkspace = $state<{
+    editFeed: (id: string) => void;
+    editCategory: (id: string) => Promise<void>;
+  }>();
+  let unreadTotal = $state<number | null>(null);
+  let countGeneration = 0;
+  const currentFeed = $derived(feeds.find((f) => f.id === feedID));
+  const currentCategory = $derived(categories.find((c) => c.id === categoryID));
   let scrollPosition = 0,
     loadGeneration = 0,
     openGeneration = 0,
@@ -89,6 +100,9 @@
     sessionEpoch++;
     openGeneration++;
     loadGeneration++;
+    countGeneration++;
+    unreadTotal = null;
+    detailsOpen = false;
     authenticated = false;
     selected = null;
     articles = [];
@@ -123,7 +137,7 @@
               ? '归档'
               : '近期文章'
   );
-  const unread = $derived(articles.filter((a) => !a.read_at).length);
+  const unread = $derived(articles.filter((a) => !a.read_at && !a.removed).length);
   const queryParams = () => ({
     scope,
     ...(favorite ? { favorite: 'true' } : {}),
@@ -196,6 +210,8 @@
   }
   async function list(append = false) {
     const generation = ++loadGeneration;
+    const counter = ++countGeneration;
+    if (!append) unreadTotal = null;
     loading = true;
     error = '';
     try {
@@ -206,11 +222,25 @@
       if (generation !== loadGeneration) return;
       articles = append ? [...articles, ...(result.items || [])] : result.items || [];
       cursor = result.next_cursor || '';
+      if (counter === countGeneration) unreadTotal = result.unread_count;
       if (!append) activeIndex = 0;
     } catch (e) {
       handleError(e);
     } finally {
       if (generation === loadGeneration) loading = false;
+    }
+  }
+  async function refreshUnreadCount() {
+    if (agentView) return;
+    const counter = ++countGeneration;
+    try {
+      const result = await api.articles({ ...queryParams(), limit: '1' });
+      if (counter === countGeneration) unreadTotal = result.unread_count;
+    } catch (e) {
+      if (counter === countGeneration) {
+        unreadTotal = null;
+        handleError(e);
+      }
     }
   }
   function handleError(e: unknown) {
@@ -241,6 +271,7 @@
     nextScope: string,
     options: { favorite?: boolean; feed?: string; category?: string } = {}
   ) {
+    detailsOpen = false;
     agentView = false;
     reportID = '';
     reportAnchor = '';
@@ -352,7 +383,10 @@
       articles = articles.map((a) =>
         a.id === updated.id ? { ...a, ...updated, content: undefined, artifacts: undefined } : a
       );
-      if (Object.hasOwn(value, 'read')) void sources().catch(handleError);
+      if (Object.hasOwn(value, 'read') || Object.hasOwn(value, 'favorite')) {
+        void sources().catch(handleError);
+      }
+      void refreshUnreadCount();
     } catch (e) {
       handleError(e);
       if (e instanceof APIError && e.status === 412 && selected?.id === target.id)
@@ -370,7 +404,7 @@
     error = '';
     const epoch = sessionEpoch;
     try {
-      for (const a of articles.filter((a) => !a.read_at)) {
+      for (const a of articles.filter((a) => !a.read_at && !a.removed)) {
         const updated = await api.patch(a, { read: true });
         if (epoch !== sessionEpoch) return;
         articles = articles.map((x) => (x.id === a.id ? updated : x));
@@ -378,11 +412,15 @@
     } catch (e) {
       handleError(e);
     } finally {
-      if (epoch === sessionEpoch) void sources().catch(handleError);
+      if (epoch === sessionEpoch) {
+        void sources().catch(handleError);
+        void refreshUnreadCount();
+      }
       busy = false;
     }
   }
   async function showSettings(initialTab = 'feeds') {
+    detailsOpen = false;
     settingsTab = initialTab;
     settingsOpen = true;
     navOpen = false;
@@ -394,6 +432,17 @@
     } catch (e) {
       handleError(e);
     }
+  }
+  async function editContext(kind: 'feed' | 'category', id: string) {
+    await showSettings(kind === 'feed' ? 'feeds' : 'categories');
+    await tick();
+    if (kind === 'feed') settingsWorkspace?.editFeed(id);
+    else await settingsWorkspace?.editCategory(id);
+  }
+  async function closeSettings() {
+    settingsOpen = false;
+    syncURL();
+    if (!agentView) await list();
   }
   async function logout() {
     try {
@@ -455,8 +504,7 @@
       else if (navOpen) navOpen = false;
       else if (selected) void closeReader();
       else if (settingsOpen) {
-        settingsOpen = false;
-        syncURL();
+        void closeSettings();
       } else return;
       e.preventDefault();
       return;
@@ -847,14 +895,12 @@
           />
         </div>{/if}
       {#if settingsOpen && SettingsComponent}<SettingsComponent
+          bind:this={settingsWorkspace}
           {feeds}
           {categories}
           initialTab={settingsTab}
           onupdate={sources}
-          onclose={() => {
-            settingsOpen = false;
-            syncURL();
-          }}
+          onclose={closeSettings}
         />
       {:else if selected}{#if error}<p class="error global-error" role="alert">
             {error}
@@ -886,8 +932,17 @@
                   size={20}
                 />{:else}<PanelLeftClose size={20} />{/if}
             </button>
-            <div>
+            <div class="list-title">
               <h1>{title}</h1>
+              {#if currentFeed || currentCategory}<button
+                  class="icon-button context-details-button"
+                  aria-label={currentFeed ? '订阅源详情' : '分类详情'}
+                  title={currentFeed ? '订阅源详情' : '分类详情'}
+                  onclick={() => {
+                    detailsOpen = true;
+                    void sources().catch(handleError);
+                  }}><Info size={18} /></button
+                >{/if}
             </div>
             <span class="article-count">已加载 {articles.length}{cursor ? '+' : ''} 篇</span>
           </div>
@@ -916,9 +971,7 @@
                 read = 'false';
                 syncURL();
                 list();
-              }}
-              >未读 <span title="当前已加载文章中的未读数">{unread}{cursor ? '+' : ''}</span
-              ></button
+              }}>未读 <span title="当前筛选范围内的全部未读数">{unreadTotal ?? '…'}</span></button
             ><button
               class:chosen={read === 'true'}
               onclick={() => {
@@ -977,7 +1030,7 @@
         <div class="article-list" bind:this={listElement} aria-busy={loading}>
           {#each articles as article, i}<div
               class="article-row"
-              class:is-read={!!article.read_at}
+              class:is-read={!!article.read_at || article.removed}
               class:keyboard-active={i === activeIndex}
             >
               <div class="article-source">
@@ -1000,7 +1053,8 @@
                 data-article-id={article.id}
                 onclick={() => open(article.id)}
               >
-                <span class="unread-dot" class:invisible={!!article.read_at}></span>
+                <span class="unread-dot" class:invisible={!!article.read_at || article.removed}
+                ></span>
                 <div class="article-summary">
                   <h2>{article.title}</h2>
                   {#if article.tags?.length}<div class="article-tags">
@@ -1053,6 +1107,26 @@
         </div>{/if}
     </main>
   </div>{/if}
+{#if detailsOpen && authenticated && (currentFeed || currentCategory)}
+  <ListDetails
+    feed={currentFeed}
+    category={currentFeed ? undefined : currentCategory}
+    {feeds}
+    {categories}
+    onclose={() => {
+      detailsOpen = false;
+    }}
+    oneditfeed={(id) => {
+      void editContext('feed', id);
+    }}
+    oneditcategory={(id) => {
+      void editContext('category', id);
+    }}
+    onfeedselect={(id) => {
+      void navigate('all', { feed: id });
+    }}
+  />
+{/if}
 {#if shortcutOpen}<div class="modal-shade">
     <div
       use:modal={() => {

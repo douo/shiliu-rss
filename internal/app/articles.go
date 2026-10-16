@@ -119,7 +119,12 @@ func (s *Service) GetArticle(ctx context.Context, articleID string) (Article, er
 }
 func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage, error) {
 	out := ArticlePage{Items: []Article{}}
-	if e := s.Store.Read.QueryRowContext(ctx, `SELECT CAST(COALESCE(max(seq),0) AS TEXT) FROM changes`).Scan(&out.HighWatermark); e != nil {
+	readTx, e := s.Store.Read.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if e != nil {
+		return out, e
+	}
+	defer readTx.Rollback()
+	if e := readTx.QueryRowContext(ctx, `SELECT CAST(COALESCE(max(seq),0) AS TEXT) FROM changes`).Scan(&out.HighWatermark); e != nil {
 		return out, e
 	}
 	if q.Limit == 0 {
@@ -153,13 +158,6 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 		where = append(where, "f.category_id=?")
 		args = append(args, q.CategoryID)
 	}
-	if q.Read != nil {
-		if *q.Read {
-			where = append(where, "a.read_at IS NOT NULL")
-		} else {
-			where = append(where, "a.read_at IS NULL AND a.removed=0")
-		}
-	}
 	if q.Favorite != nil {
 		where = append(where, "a.favorite=?")
 		args = append(args, *q.Favorite)
@@ -172,25 +170,6 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 		where = append(where, "a.first_seen_at<?")
 		args = append(args, stamp(*q.Until))
 	}
-	if q.Cursor != "" {
-		raw, e := base64.RawURLEncoding.DecodeString(q.Cursor)
-		if e != nil {
-			return out, ErrInvalid
-		}
-		p := strings.Split(string(raw), "|")
-		if len(p) != 3 || p[0] != "published" {
-			return out, ErrInvalid
-		}
-		if n, err := strconv.ParseInt(p[2], 10, 64); err != nil || n < 1 {
-			return out, ErrInvalid
-		}
-		at, e := time.Parse(time.RFC3339Nano, p[1])
-		if e != nil {
-			return out, ErrInvalid
-		}
-		where = append(where, "("+articleOrderTime+"<? OR ("+articleOrderTime+"=? AND a.id<?))")
-		args = append(args, stamp(at), stamp(at), p[2])
-	}
 	if q.Query != "" {
 		_, e := searchQuery(q.Query)
 		if e != nil {
@@ -200,7 +179,7 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 		// broad query when the page only needs 50 rows. Sparse terms still use
 		// an FTS candidate set so they do not scan all article metadata.
 		fullMatch, _ := searchQuery(q.Query)
-		probe, err := s.Store.Read.QueryContext(ctx, `SELECT rowid FROM search WHERE search MATCH ? LIMIT 201`, fullMatch)
+		probe, err := readTx.QueryContext(ctx, `SELECT rowid FROM search WHERE search MATCH ? LIMIT 201`, fullMatch)
 		if err != nil {
 			return out, err
 		}
@@ -223,8 +202,38 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 			args = append(args, "{title url organization} : ("+match+")", now, "feed_content : ("+match+")", now, "fulltext : ("+match+")")
 		}
 	}
+	// Count the complete context before applying the read tab or page boundary.
+	if e := readTx.QueryRowContext(ctx, `SELECT count(*) FROM articles a JOIN feeds f ON f.id=a.feed_id WHERE `+strings.Join(where, " AND ")+` AND a.read_at IS NULL AND a.removed=0`, args...).Scan(&out.UnreadCount); e != nil {
+		return out, e
+	}
+	if q.Read != nil {
+		if *q.Read {
+			where = append(where, "a.read_at IS NOT NULL")
+		} else {
+			where = append(where, "a.read_at IS NULL AND a.removed=0")
+		}
+	}
+	if q.Cursor != "" {
+		raw, e := base64.RawURLEncoding.DecodeString(q.Cursor)
+		if e != nil {
+			return out, ErrInvalid
+		}
+		p := strings.Split(string(raw), "|")
+		if len(p) != 3 || p[0] != "published" {
+			return out, ErrInvalid
+		}
+		if n, err := strconv.ParseInt(p[2], 10, 64); err != nil || n < 1 {
+			return out, ErrInvalid
+		}
+		at, e := time.Parse(time.RFC3339Nano, p[1])
+		if e != nil {
+			return out, ErrInvalid
+		}
+		where = append(where, "("+articleOrderTime+"<? OR ("+articleOrderTime+"=? AND a.id<?))")
+		args = append(args, stamp(at), stamp(at), p[2])
+	}
 	args = append(args, q.Limit+1)
-	rows, e := s.Store.Read.QueryContext(ctx, `SELECT `+articleCols+` FROM articles a JOIN feeds f ON f.id=a.feed_id WHERE `+strings.Join(where, " AND ")+` ORDER BY `+articleOrderTime+` DESC,a.id DESC LIMIT ?`, args...)
+	rows, e := readTx.QueryContext(ctx, `SELECT `+articleCols+` FROM articles a JOIN feeds f ON f.id=a.feed_id WHERE `+strings.Join(where, " AND ")+` ORDER BY `+articleOrderTime+` DESC,a.id DESC LIMIT ?`, args...)
 	if e != nil {
 		return out, e
 	}
@@ -247,6 +256,9 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 		out.Items = out.Items[:q.Limit]
 		last := out.Items[q.Limit-1]
 		out.NextCursor = base64.RawURLEncoding.EncodeToString([]byte("published|" + stamp(articleDate(last)) + "|" + last.ID))
+	}
+	if e = readTx.Commit(); e != nil {
+		return out, e
 	}
 	for i := range out.Items {
 		if e = s.loadContent(ctx, &out.Items[i], archives[i], false); e != nil {

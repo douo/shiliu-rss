@@ -71,7 +71,16 @@ test('real API: subscription → background ingestion → reading → full text 
     .locator('.unread-count');
   if (mobile) await page.getByRole('button', { name: '打开导航', exact: true }).click();
   await expect(sourceBadge).toHaveText('1');
-  if (mobile) await page.keyboard.press('Escape');
+  await page
+    .getByRole('navigation', { name: '订阅源', exact: true })
+    .getByRole('button', { name: `本机合成订阅 ${new URL(origin).port}`, exact: true })
+    .click();
+  await expect(page.getByRole('button', { name: /^未读 / })).toHaveText('未读 1');
+  await page.getByRole('button', { name: '订阅源详情', exact: true }).click();
+  const details = page.getByRole('dialog', { name: '订阅源详情', exact: true });
+  await expect(details).toContainText('1 篇（含归档）');
+  await expect(details).toContainText(`${origin}/feed`);
+  await details.getByRole('button', { name: '关闭详情', exact: true }).click();
   await page
     .getByRole('heading', { name: `本机阅读闭环 ${new URL(origin).port}`, exact: true })
     .first()
@@ -102,4 +111,6 @@ test('real API: subscription → background ingestion → reading → full text 
     path: `test-results/${info.project.name}-real-service.png`,
     fullPage: true
   });
+  await page.getByRole('button', { name: '返回列表 (Esc)', exact: true }).click();
+  await expect(page.getByRole('button', { name: /^未读 / })).toHaveText('未读 0');
 });

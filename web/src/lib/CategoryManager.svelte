@@ -59,6 +59,10 @@
     title = mode === 'rename' ? current?.title || '' : '';
     error = '';
   }
+  export function editCategory(id: string) {
+    select(id);
+    if (current) open('rename');
+  }
   async function action(fn: () => Promise<void>) {
     busy = true;
     error = '';

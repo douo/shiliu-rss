@@ -721,6 +721,11 @@ export interface components {
             items: components["schemas"]["Article"][];
             next_cursor: string;
             high_watermark: string;
+            /**
+             * Format: int64
+             * @description Unread total matching scope, feed, category, favorite, search and date filters; excludes removed and ignores read, cursor and limit. Count and list share one read snapshot.
+             */
+            unread_count: number;
         };
         BulkRead: {
             ids: string[];

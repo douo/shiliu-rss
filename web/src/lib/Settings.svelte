@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import {
     Plus,
     RefreshCw,
@@ -54,6 +55,7 @@
   let preview = $state<{ articles: number; contents: number; bytes: number } | null>(null),
     health = $state<Record<string, unknown> | null>(null);
   let previewSignature = '';
+  let categoryManager = $state<{ editCategory: (id: string) => void }>();
   $effect(() => {
     tab = initialTab;
   });
@@ -117,6 +119,18 @@
           unread_days: 30
         };
     preview = null;
+  }
+  export function editFeed(id: string) {
+    const feed = feeds.find((f) => f.id === id);
+    if (feed) {
+      tab = 'feeds';
+      edit(feed);
+    }
+  }
+  export async function editCategory(id: string) {
+    tab = 'categories';
+    await tick();
+    categoryManager?.editCategory(id);
   }
   async function saveFeed() {
     if (!editing) return;
@@ -284,7 +298,7 @@
       </div>
     </div>
   {:else if tab === 'categories'}
-    <CategoryManager {feeds} {categories} {onupdate} onedit={edit} />
+    <CategoryManager bind:this={categoryManager} {feeds} {categories} {onupdate} onedit={edit} />
   {:else if tab === 'agent'}
     <AgentConfig />
   {:else if tab === 'tokens'}

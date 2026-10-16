@@ -6122,12 +6122,19 @@
           },
           "high_watermark": {
             "type": "string"
+          },
+          "unread_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Unread total matching scope, feed, category, favorite, search and date filters; excludes removed and ignores read, cursor and limit. Count and list share one read snapshot."
           }
         },
         "required": [
           "items",
           "next_cursor",
-          "high_watermark"
+          "high_watermark",
+          "unread_count"
         ]
       },
       "BulkRead": {

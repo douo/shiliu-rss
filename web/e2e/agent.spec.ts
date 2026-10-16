@@ -315,7 +315,7 @@ test('morning report is home, citations return to their place, and mark-read cov
       }
       body = article;
     } else if (path === '/api/v1/articles')
-      body = { items: [], high_watermark: '1', next_cursor: '' };
+      body = { items: [], unread_count: 0, high_watermark: '1', next_cursor: '' };
     else throw new Error(`Unexpected request: ${path}`);
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
   });

@@ -74,8 +74,8 @@ func TestRetentionSearchAndExplicitRefetch(t *testing.T) {
 		if e != nil {
 			t.Fatal(e)
 		}
-		if len(page.Items) != q.want {
-			t.Fatalf("search %s: got %d", q.term, len(page.Items))
+		if len(page.Items) != q.want || page.UnreadCount != int64(q.want) {
+			t.Fatalf("search %s: got %d items, %d unread", q.term, len(page.Items), page.UnreadCount)
 		}
 	}
 	a, e = s.GetArticle(ctx, a.ID)

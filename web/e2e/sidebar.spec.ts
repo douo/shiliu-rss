@@ -49,7 +49,7 @@ async function sidebarData(page: Page) {
     else if (path.endsWith('/feeds')) result = feeds;
     else if (path.endsWith('/categories')) result = categories;
     else if (path.endsWith('/articles'))
-      result = { items: [], high_watermark: '0', next_cursor: '' };
+      result = { items: [], unread_count: 0, high_watermark: '0', next_cursor: '' };
     else throw new Error(`Unexpected request ${path}`);
     await route.fulfill({ json: result });
   });

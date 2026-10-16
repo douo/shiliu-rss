@@ -94,7 +94,7 @@ async function mockCategories(page: Page, stale = false) {
       Object.assign(feed, req.postDataJSON(), { version: feed.version + 1 });
       result = feed;
     } else if (path.endsWith('/articles'))
-      result = { items: [], next_cursor: '', high_watermark: '0' };
+      result = { items: [], unread_count: 0, next_cursor: '', high_watermark: '0' };
     await route.fulfill({ json: result });
   });
   return { categories, feeds, writes };

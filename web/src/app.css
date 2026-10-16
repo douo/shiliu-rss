@@ -481,6 +481,18 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.page-heading .list-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.list-title h1 {
+  min-width: 0;
+}
+.context-details-button {
+  flex-shrink: 0;
+  color: var(--muted);
+}
 .article-count {
   flex-shrink: 0;
   font-size: 12px;

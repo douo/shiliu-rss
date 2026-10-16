@@ -335,6 +335,9 @@ type ArticlePage struct {
 	HighWatermark string    `json:"high_watermark"`
 	Items         []Article `json:"items"`
 	NextCursor    string    `json:"next_cursor"`
+
+	// UnreadCount Unread total matching scope, feed, category, favorite, search and date filters; excludes removed and ignores read, cursor and limit. Count and list share one read snapshot.
+	UnreadCount int64 `json:"unread_count"`
 }
 
 // ArticlePatch Examples: {"favorite":true,"version":3}

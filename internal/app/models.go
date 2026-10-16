@@ -94,6 +94,7 @@ type ArticleQuery struct {
 	Until      *time.Time
 }
 type ArticlePage struct {
+	UnreadCount   int64     `json:"unread_count"`
 	Items         []Article `json:"items"`
 	NextCursor    string    `json:"next_cursor"`
 	HighWatermark string    `json:"high_watermark"`

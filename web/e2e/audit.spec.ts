@@ -71,6 +71,7 @@ async function auditedAPI(context: BrowserContext) {
     else if (path.endsWith('/articles'))
       result = {
         items: [{ ...article, content: undefined }],
+        unread_count: article.read_at || article.removed ? 0 : 1,
         next_cursor: '',
         high_watermark: '1'
       };

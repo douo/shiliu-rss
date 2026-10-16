@@ -105,7 +105,13 @@ async function mock(
     if (path.endsWith('/session')) result = { authenticated: true, csrf_token: 'synthetic-csrf' };
     else if (path.endsWith('/feeds')) result = sources;
     else if (path.endsWith('/categories')) result = groups;
-    else if (path.endsWith('/articles')) result = { items, next_cursor: '', high_watermark: '30' };
+    else if (path.endsWith('/articles'))
+      result = {
+        items,
+        unread_count: items.filter((a) => !a.read_at && !a.removed).length,
+        next_cursor: '',
+        high_watermark: '30'
+      };
     else if (/\/articles\/\d+$/.test(path)) {
       const a = items.find((x) => x.id === path.split('/').at(-1))!;
       if (req.method() === 'PATCH') {

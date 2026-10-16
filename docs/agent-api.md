@@ -17,7 +17,7 @@
 
 ## 分页及增量
 
-`GET /articles?scope=all&limit=50` 返回 items、next_cursor、high_watermark。ID/游标序号都是字符串；列表不含正文，单篇用 `GET /articles/{id}`。近期 recent、归档 archive、全部 all 明确选择；归档不是删除。正文状态/有效截止由服务器返回，过期正文不会因尚未运行物理清理而继续可读或命中搜索。
+`GET /articles?scope=all&limit=50` 返回 items、next_cursor、high_watermark、unread_count。unread_count按完整范围/源/分类/收藏/搜索/日期条件统计未读，排除removed，忽略read标签与分页参数；同一响应中的计数与列表共用只读快照，跨请求仍会随阅读/抓取变化。ID/游标序号都是字符串；列表不含正文，单篇用 `GET /articles/{id}`。近期 recent、归档 archive、全部 all 明确选择；归档不是删除。正文状态/有效截止由服务器返回，过期正文不会因尚未运行物理清理而继续可读或命中搜索。
 
 1. 首次扫描保存第一页的 `high_watermark`。
 2. 保持筛选参数，使用不透明 `next_cursor` 继续`(COALESCE(published_at,first_seen_at),id)` 倒序 keyset 扫描（发布时间优先；旧收录时间游标返回400，应重新从首页扫描），空游标结束。
