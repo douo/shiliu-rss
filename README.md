@@ -2,7 +2,7 @@
 
 自托管的个人 RSS 阅读器，支持后台更新、按源保存、晨报与对话式 Agent。Go + SQLite 单进程，Svelte 5 / TypeScript / SvelteKit 静态前端，Tailwind CSS 4。图标为[抽象石榴 SVG](assets/icon.svg)。
 
-当前已实现 R-01–R-29，并完成本机功能验证及一次实际部署、Miniflux 全量迁移。最新验收为 60 项桌面/手机浏览器检查；模型语义质量、真实移动浏览器和目标设备性能仍有验证边界，见[实施记录](docs/implementation.md)。仓库只保留通用配置和脱敏文档。
+首页提供每日未读晨报，也可按订阅源、分类、收藏和归档阅读文章。支持从 Miniflux 迁移订阅、文章与阅读状态。功能验收与已知限制见[实施记录](docs/implementation.md)。
 
 ## 本机启动
 
@@ -68,6 +68,6 @@ PostgreSQL 一致快照测试需要本机 PostgreSQL CLI；缺少时明确跳过
 | 技术、架构与决策 | [技术选型](docs/technology.md)、[架构](docs/architecture.md)、[决策](docs/decisions.md) |
 | Agent 设计与契约 | [系统设计](docs/agent-design.md)、[提示词](docs/agent-prompts.md)、[API](docs/agent-api.md)、[OpenAPI](api/openapi.yaml) |
 | 开发、迁移与运维 | [前端说明](web/README.md)、[操作说明](docs/operations.md)、[部署指南](docs/production.md) |
-| 敏感信息与发布边界 | [安全与脱敏](docs/security.md) |
+| 凭据、备份与敏感数据 | [安全说明](docs/security.md) |
 
-开发、测试、构建和恢复演练在本机，NAS 仅接收已验证的发布产物。[部署模板](deploy/compose.yaml)要求显式配置镜像、HTTPS 地址、端口和备份目录。数据库、真实订阅、凭据、截图、日志和私有运维记录均不应提交；实际实例地址和存储布局不属于仓库配置。
+使用 [Docker Compose 模板](deploy/compose.yaml)部署，配置镜像版本、HTTPS 地址、主机端口和备份目录。初始化、反向代理、升级与回退步骤见[部署指南](docs/production.md)。

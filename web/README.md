@@ -39,7 +39,7 @@ Kit 3 配置通过 Vite `sveltekit({...})` 传入，TypeScript 继承 `$app/tsco
 | `Enter` / `Tab` | 原生控件启用 / 焦点移动 |
 | `Esc` | 关闭当前浮层、导航、正文或设置 |
 
-使用无修饰小写 `KeyboardEvent.key`，避让 Vimium 默认键及序列前缀。输入、组合输入、表单、设置、弹窗不触发后台阅读操作；长按动作键不重复切换。自定义 Vimium 映射仍可能冲突。旧 Alt+Shift 方案已撤回。
+使用无修饰小写 `KeyboardEvent.key`，避让 Vimium 默认键及序列前缀。输入、组合输入、表单、设置、弹窗不触发后台阅读操作；长按动作键不重复切换。自定义 Vimium 映射仍可能冲突。
 
 ## 安全与生命周期
 

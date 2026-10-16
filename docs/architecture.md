@@ -1,8 +1,8 @@
-# 首版架构
+# 系统架构
 
-日期：2026-10-15。状态：首版实现与本机验证已完成，2026-10-16已部署NAS并切换Miniflux，部署步骤见production.md。遵守 [产品基线](product.md)；技术组合与取舍见 [技术选型](technology.md)。本文件规定模块边界和关键不变量，具体 SQL 在 migrations/，契约在 api/openapi.yaml，启动命令见 README/Makefile。
+本文说明模块边界、数据模型、事务和生命周期规则。产品范围见[产品需求](product.md)，技术取舍见[技术选型](technology.md)。SQL 位于 `migrations/`，API 契约位于 `api/openapi.yaml`，启动命令见 README 和 Makefile。
 
-**本次架构增补：** R-19–R-23 将 Agent 从外部 API 调用方扩展为系统内置模块。完整新架构见 [Agent 系统设计](agent-design.md)，配置、晨报、对话与 SQL/OpenAPI 均已实现。下列首版的身份/scope描述记录既有实现，本次不据此新增 Agent 权限系统。
+内置 Agent 与阅读器共享进程、数据库和业务 API，负责模型配置、定时晨报、对话和外部查询。执行流程、预算及恢复机制见 [Agent 系统设计](agent-design.md)。
 
 ## 一个进程，三类入口
 
@@ -21,9 +21,9 @@ flowchart TD
     Assistant --> Model[可配置模型 API / 未配置停用]
 ```
 
-静态资源服务、API、后台工作在同一个 Go 进程。Svelte 页面在浏览器运行，与 Agent 调用同一 API；应用层负责事务、权限和产品规则，存储层负责 SQL，抓取适配器负责外部输入。NAS 没有 SvelteKit/Node 服务进程。
+静态资源服务、API、后台工作在同一个 Go 进程。Svelte 页面在浏览器运行，与 Agent 调用同一 API；应用层负责事务、权限和产品规则，存储层负责 SQL，抓取适配器负责外部输入。运行环境无需 SvelteKit/Node 服务进程。
 
-当前代码采用 `cmd/reader`、`internal/{app,store,http,fetch,jobs,importer,agent}`、`migrations`、`api`和 `web`；测试随相应模块维护，目录按需要创建，不预建空目录或为每个实体制造一套抽象。领域类型与规则先放 app，遇到实际复用再提取。时钟、网络和事务边界可注入，便于验证重启、退避与到期行为。
+当前代码采用 `cmd/reader`、`internal/{app,store,http,fetch,jobs,importer,agent}`、`migrations`、`api`和 `web`；测试随相应模块维护，领域类型与业务规则位于 app，SQL 位于 store。时钟、网络和事务边界可注入，便于验证重启、退避与到期行为。
 
 `web/` 是 Svelte 5 + TypeScript + SvelteKit 工程，Tailwind CSS 4 编译样式，按需采用 shadcn-svelte。路由包括列表、阅读、归档、源设置与健康页；状态在组件或相关页面间管理，不复制服务端的过期/授权规则。后台响应给出正文状态和期限，前端据此显示并在期限到达或页面重新激活时重新核对。导航请求可取消，乐观已读/收藏支持失败回滚。
 
@@ -79,7 +79,7 @@ SQLite 使用 WAL、每连接 `foreign_keys=ON`、`busy_timeout=5000`、`synchro
 
 OpenAPI 3.1.0 为契约源；用 oapi-codegen 生成 Go 类型和标准 HTTP 严格处理器，手写适配器调用应用层；用 openapi-typescript / openapi-fetch 生成前端类型并发请求。业务校验、scope、CSRF 与错误映射显式实现；生成代码不会替代这些检查。首版提供 `/api/v1`，所有能力有稳定 operationId、成功/失败示例和界限说明。
 
-| 接口组（实现时细化契约） | 规则 |
+| 接口组 | 规则 |
 |---|---|
 | articles / feeds / search | 查询近期、归档或全部，明确 body_state、来源、版本与有效截止；默认分页 50、最大 200，正文按需请求 |
 | changes | 单调整数 seq（对外字符串）增量游标；只存对象 ID、变更类型和版本，不存旧正文 |
@@ -92,7 +92,7 @@ OpenAPI 3.1.0 为契约源；用 oapi-codegen 生成 Go 类型和标准 HTTP 严
 
 变更日志首版保留紧凑元数据，未来若压缩须明确 cursor 失效并要求全量重新同步，不能无声跳过。API 请求不跨分页持有数据库事务。写回用 Idempotency-Key + token 身份 + 操作组成唯一键，保存请求 hash 与结果引用；同键不同内容返回 409。摘要写入另有调用方稳定 external_id，防止重试窗口之后重复产物；任务重复由活动唯一约束合并。幂等键至少保留 30 天，此期限写入契约。
 
-上述普通分页/changes不冻结未读状态。晨报需短事务一次固定成员，再在事务外读取有效内容、处理模型；新文章/已读/分类变更不悄悄改变当轮集合。新报告/会话、内部引用、独立模型执行槽、预算账本与生命周期边界按 [Agent设计](agent-design.md) 实施。
+上述普通分页/changes不冻结未读状态。晨报需短事务一次固定成员，再在事务外读取有效内容、处理模型；新文章/已读/分类变更不悄悄改变当轮集合。新报告/会话、内部引用、独立模型执行槽、预算账本与生命周期边界见 [Agent 设计](agent-design.md)。
 
 编辑采用 ETag/If-Match 或显式 version，过期版本返回 412；摘要依赖的内容 hash 已变化时返回 409，并让调用方重新获取依据。正文已清理时仍可显示旧摘要及其 hash，但不谎称原文仍在。错误使用 `application/problem+json`，有稳定 code、request_id 和可重试提示；不用 HTTP 200 包装所有错误。
 
@@ -102,7 +102,7 @@ scope 至少区分 articles:read、artifacts:write、fulltext:request、reading:
 
 ## Miniflux 迁移
 
-选择**版本适配的只读 PostgreSQL 一致快照导出 → 流式导入新的 SQLite**。旧实例 2.3.0 的实际 schema 在实施时核验；不依赖 OPML 完成文章迁移，也不把网页 API 多次分页误认为一致快照。API 作为抽样核对和订阅交换的辅助，导出在 `REPEATABLE READ READ ONLY` 事务中读取所需列；脚本经 SSH stdin，数据流到执行端，不在 NAS 留中间 JSON/SQL 转储。
+选择**版本适配的只读 PostgreSQL 一致快照导出 → 流式导入新的 SQLite**。导出器适配 Miniflux 2.3.0 schema；不依赖 OPML 完成文章迁移，也不把网页 API 多次分页误认为一致快照。API 作为抽样核对和订阅交换的辅助，导出在 `REPEATABLE READ READ ONLY` 事务中读取所需列；脚本经 SSH stdin，数据流到执行端，不在 NAS 留中间 JSON/SQL 转储。
 
 保留源实例与原主键、旧 hash、状态及可用时间，首次导入源默认普通保存；显式 disabled 保留，累计错误不能映射成人工暂停。已有抓取/认证/重写等源配置先列兼容情况，不能静默丢掉会影响抓取的设置；不兼容项进入迁移差异报告，凭据按敏感配置单独传输。
 
@@ -110,39 +110,29 @@ first_seen_at 优先源系统 created_at；确实缺失时用固定导入时间�
 
 以 `(source_instance,entity_type,source_id)` 去重，重跑同批不刷新 imported_at 或 30 天保护期。同步已有身份别名，使后续正常 RSS 轮询能匹配迁入条目；旧 ID 与新 GUID/URL 的映射冲突必须报告。迁移后正文统一净化并建立索引。
 
-先预览再导入，核对分类、订阅、文章、已读、收藏、关联、样本内容、时间兜底和不兼容配置；再运行重复导入与真实 feed 重抓去重验证。旧系统在演练期间照常运行；正式切换再安排稳定窗口/最终差量核对，未对齐期间不把新库当成唯一权威。此前阶段仅设计；后续已获授权并完成真实全量迁移，通用切换与差异处理见production.md。
+先预览再导入，核对分类、订阅、文章、已读、收藏、关联、样本内容、时间兜底和不兼容配置；再运行重复导入与真实 feed 重抓去重验证。切换前固定旧系统的写入边界并核对最终快照。切换与差异处理步骤见[部署指南](production.md)。
 
-## 本机开发与 NAS 部署
+## 构建与部署
 
-| 阶段 | 执行位置与产物 |
-|---|---|
-| 开发 | 本机 Go API 与 Vite 开发服务器；本机 SQLite，开发代理 `/api` 到 Go，使用脱敏/合成数据 |
-| 测试 | 本机 Go 集成测试、svelte-check 和 Playwright；故障、重启、清理、导入和恢复演练均用本机测试库 |
-| 构建 | 本机 pnpm 静态构建，再 Go 交叉编译 `linux/amd64`、`GOAMD64=v1`、`CGO_ENABLED=0`；本机打包镜像 |
-| 成品验证 | 本机 Linux 容器/虚拟机验证实际成品；Mac 原生测试不能代替 Linux 运行验证，AMD64 模拟运行不能代替 J1900 功耗实测 |
-| 部署 | NAS 接收固定版本镜像和运行配置，挂载持久数据；只确认健康、正常访问与运行资源，不承担开发/压力/故障测试 |
+前端使用项目固定的 Node/pnpm 工具链生成静态资源，嵌入 Go 二进制；发布目标为 `linux/amd64`、`GOAMD64=v1`、`CGO_ENABLED=0`。镜像包含二进制、静态资源和 CA 证书，运行时无需开发工具链。构建及 Linux 容器验证命令见[操作说明](operations.md)。
 
-本机已配置独立Colima/Lima Linux环境、Docker/Buildx CLI，实际AMD64镜像在本机Rosetta运行验证；不把构建转移到NAS。前端工具链用项目固定的 Node LTS/pnpm 与 lockfile；构建产物中只有发布用的二进制/静态资源，不带 node_modules、源码工具链和测试数据。
+开发 API 和 Vite 端口固定在 `config/dev.env`，分别为 41001 和 41002。发布服务的主机端口通过 Compose 配置，绑定回环地址，由 nginx 提供 HTTPS 入口。
 
-端口分两个环境处理：**本机** API/Vite 首次配置通过本机 APR 分配并持久化，设置 agent.type=codex，不在每次启动调用 ensure；**NAS 没有 APR**，按用户明确的工作流，在部署时读取实际监听/容器映射和 NAS 台账，选定可用端口后固化到 Compose/nginx 并登记。本机 APR 不替 NAS 分配端口，也不为了这个项目向 NAS 安装 APR。本机固定 API41001/Vite41002 于 config/dev.env；部署端口通过私有配置显式指定。
+## 存储、备份与维护
 
-## 部署存储、备份与维护
+数据库使用主机持久卷中的 `data/reader.db`；SQLite、WAL 和 SHM 同机同目录，使用本地文件系统。容器以非 root 用户运行，根文件系统只读，数据卷可写。配置参数和目录权限见[部署指南](production.md)。
 
-部署设计路径为 `/var/opt/shiliu-rss/`，放 Compose、必要配置和 `data/reader.db`（SSD ext4）；数据库及 WAL/SHM 同机同目录，不放 NFS 或 Docker 可写镜像层。容器非 root、镜像只读、可写 data 挂载，使用带 CA 证书的精简运行镜像，Linux AMD64 基线不启用 J1900 不支持的扩展。NAS 只运行本机构建好的成品。
+每日执行一次 SQLite 一致性备份，目标为 `SHILIU_BACKUP_PATH` 指定的专用目录，建议与数据库分盘。备份使用 `VACUUM INTO`，完整性和外键检查、文件同步及原子发布成功后轮换，最多保留 7 个成功版本；失败不删除已有成功副本。直接复制运行中的主 `.db` 文件不能保证一致性。
 
-NAS 容器映射到主机回环地址，由 nginx 提供 LAN/VPN HTTPS 入口。不得直接套用现有 `docker-compose@` 的 restart 流程：该模板会拉镜像，升级和普通重启应区分。
+恢复库在替换前检查 schema、完整性及关联，并执行到期正文清理，避免旧备份重新暴露过期内容。恢复目标 RPO 为 24 小时、RTO 为 30 分钟，已测数据规模及耗时见[实施记录](implementation.md)。备份与数据盘分离可以覆盖单盘故障；整机丢失还需独立的异地副本。
 
-设计采用每日一次 SQLite 一致性备份，目标为另一块存储上的 `SHILIU_BACKUP_PATH` 指定的专用目录，最多保留 7 个成功版本；这是有轮换上限的恢复用途，不是开发中间备份。初始目标 RPO 24 小时、测试规模内 RTO 30 分钟，需演练验证。目的地权限仅运维用户可读，备份包含私密源信息和文章，不能纳入公开仓库。Btrfs 阵列备份覆盖系统 SSD 故障，不覆盖整机丢失，异地副本留给后续实际需要。
-
-备份使用 SQLite 在线备份接口；首次实现验证所选驱动的封装，若使用 `VACUUM INTO` 则需测量完整复制开销并安排低负载窗口。不能只拷贝正在运行的主 .db 文件。生成完整备份后完整性校验、原子更名，再按上限轮换；失败不删除最近成功副本。恢复在本地演练，确认数据库/版本后先执行应有的生命周期清理再开放读取，避免旧备份重新暴露已过期正文。参考：[SQLite 在线备份](https://sqlite.org/backup.html)。
-
-应用日志写 stdout，Docker 轮换初始每份 5 MiB、最多 3 份；不记录成功轮询的逐条正文流水。健康数据存在业务库，开发报告、一次性脚本和构建缓存留本机。NAS 台账仅在实际部署后更新已存在的服务事实，不预写“已上线”。
+应用日志写 stdout，由 Docker 按每份 5 MiB、最多 3 份轮换。日志记录错误码和必要对象 ID，不记录正文、私密 URL、认证头或模型原始响应；源健康状态保存在业务库中。
 
 ## 实施验收
 
 先用真实临时 SQLite 和可控 HTTP 源测试持久任务、重启、故障恢复、去重、收藏/清理竞态和 Agent 重试；时间用可控时钟，不让测试等待真实 7/30/90 天。A01–A10 映射到测试或人工验收，契约生成结果必须无漂移。数据迁移要测老 schema 升级、失败回滚与备份恢复。
 
-界面用本机 Playwright 覆盖阅读闭环、手机尺寸、快捷键和路由深链接，直接以浏览器验证复杂交互状态；检查 JS/CSS 构建体积。NAS 部署后仅观察技术选型中的正常运行预算；基础搜索实验不替代全产品、迁移、断电或恢复验证。详细OpenAPI、建表SQL、容器配置和可执行命令均已落盘，结果及未验证边界见 [实施验收](implementation.md)。
+Playwright 覆盖阅读闭环、手机尺寸、快捷键和路由深链接；构建检查 JS/CSS 体积。验证范围、结果和已知限制见[实施记录](implementation.md)。
 
 ## 已落地的补充边界
 

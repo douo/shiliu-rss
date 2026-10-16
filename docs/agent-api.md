@@ -1,10 +1,10 @@
 # Agent 接入
 
-本文描述已实现的首版外部API。新增内置晨报、对话、外部查询/报告已实现并进入 OpenAPI，详见 [Agent系统设计](agent-design.md)。用户要求简化，本次不新增Agent角色、scope或逐次批准流程，复用现有入口。
+本文描述文章读取、摘要写回、全文任务，以及晨报、对话、查询和汇报接口。内置工作流见 [Agent 系统设计](agent-design.md)。
 
 共同契约为 [OpenAPI 3.1](../api/openapi.yaml)，生成 [Go 严格处理器](../api/generated.go) 和 [TypeScript 类型](../web/src/lib/api.generated.ts)。`make check-generated` 检查漂移。浏览器与 Agent 调用同一业务层，没有直写数据库的 Agent 接口。
 
-基础地址 `/api/v1`。本人在设置创建 token；明文只返回一次，库里存 hash。请求使用 `Authorization: Bearer <token>`，不把 token 放 URL、浏览器 localStorage、日志或仓库。撤销在后续请求生效，业务写事务再次检查撤销，避免认证后的竞态。
+基础地址 `/api/v1`。在设置中创建 token；明文只返回一次，库里存 hash。请求使用 `Authorization: Bearer <token>`，不把 token 放 URL、浏览器 localStorage、日志或仓库。撤销在后续请求生效，业务写事务再次检查撤销，避免认证后的竞态。
 
 | Scope | 能力 |
 |---|---|

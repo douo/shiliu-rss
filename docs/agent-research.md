@@ -1,39 +1,39 @@
 # 内置 Agent 调研
 
-日期：2026-10-15。范围：晨报、对话、模型 API、检索、引用与可恢复执行。本文保留调研时的历史判断，不是当前实现清单，也不是模型效果、费用或 NAS 性能验收。后续 Responses/Chat 接入与本机合成接口验证已完成，当前状态以实施记录为准。设计见 [Agent 系统设计](agent-design.md)。
+调研日期：2026-10-15。范围：晨报、对话、模型 API、检索、引用与可恢复执行。当前实现见 [Agent 系统设计](agent-design.md)，验证结果见[实施记录](implementation.md)。
 
-## 调研时的现状与方向
+## 设计问题
 
-原设计只有外部 Agent API：分页读文章、changes、显式全文任务、独立 artifact 写回。没有模型配置、晨报计划、报告、对话或片段检索。原 R-11 的“自动总结以后接”与本次要求不同，需要重设计产品模块与执行流程，不能把旧 API 包一层聊天框就算完成。
+晨报需要固定全部未读成员并跟踪每篇的处理状态，对话需要按问题检索证据。普通文章分页和 top-k 检索均不能保证完整晨报覆盖，因此需要独立的报告快照与分层处理流程。
 
-用户本次已确认：接 OpenAI 兼容模型 API；Agent 可配置，未配置则停用；每天 Asia/Shanghai 08:00 统计全部未读，包括归档；持续未读复用摘要；仅重要源允许按策略补抓全文；按原分类、源的重要度与未读量组织报告；段落引用内部文章链接；提供内置对话和外部接入。不增加角色、权限矩阵或逐次授权流程。
+模型服务通过可配置的 OpenAI 兼容 API 接入，未配置时停用。报告按原分类、源的重要度与未读量组织，引用系统内部文章链接；重要源可按策略补抓全文。调度、对话和外部接入共享业务规则。
 
-## 实际阅读的外部资料
+## 参考资料
 
-下列页面于 2026-10-15 实际取得并阅读。研究中的模型、数据集和提升数字不外推到本项目。
+下列资料支持工作流、分层摘要和检索方案的选择。其模型、数据集和提升数字不能直接外推到 RSS 场景。
 
 | 资料 | 读到的结论 | 对本项目的影响与限制 |
 |---|---|---|
 | [Anthropic: Building effective agents](https://www.anthropic.com/research/building-effective-agents)，2024-12-19 | 区分固定 workflow 和模型动态决策的 agent；建议从简单 API、明确工具和可验证的步骤开始，按效果增加复杂度 | 晨报用确定性流水线；对话用有限检索循环。Go 内实现，无需引入 Agent 平台或复杂框架。页面也注明部分工具介绍后来变化，不依赖其中的产品型号或 SDK 推荐 |
-| [Lost in the Middle](https://arxiv.org/html/2307.03172v3)，2023-11-20 版本 | 在论文所测模型和问答/检索任务中，上下文位置影响结果，能容纳长文本不等于可靠使用每一部分 | 不把数千篇全文一次塞入长上下文；为重要长文逐块处理、检验覆盖。论文未测本次未知模型，也不是 RSS 摘要评测，需本地质量验收 |
+| [Lost in the Middle](https://arxiv.org/html/2307.03172v3)，2023-11-20 版本 | 在论文所测模型和问答/检索任务中，上下文位置影响结果，能容纳长文本不等于可靠使用每一部分 | 不把数千篇全文一次塞入长上下文；为重要长文逐块处理、检验覆盖。论文不是 RSS 摘要评测，需用实际模型和文章集验证 |
 | [RAPTOR](https://arxiv.org/html/2401.18059v1)，2024-01-31 版本 | 片段、递归摘要、多层检索有助于同时获取局部证据和全局主题；原方案含 embedding 和聚类 | 借鉴“文章摘要 → 来源/分类摘要 → 总览”的层次及追溯关系；不直接移植其聚类、建树和模型组合，不声称实现 RAPTOR |
 | [Anthropic: Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)，2024-09-19 | 精确术语的词法检索与语义检索互补；切块会丢上下文；片段加上下文、融合检索和重排均需评测，增加成本/延迟 | 片段带文章标题、源、日期、节标题；FTS 为第一阶段，embedding/重排为可选增强。论文/厂商博客中的 top-20 和效果数字不是本项目默认值的证明；也不能把整篇摘要代替原始证据 |
 | [Microsoft: Hybrid search RRF](https://learn.microsoft.com/en-us/azure/search/hybrid-search-ranking)，页面更新 2026-06-08 | 多个排名列表可用 reciprocal rank fusion 融合；词法、向量原始分数不在同一标度；重排在融合之后 | 可选向量阶段用 RRF 合并名次，不直接相加 BM25 与 cosine 分数；不引入 Azure 服务 |
 | [ALCE: Enabling LLMs to Generate Text with Citations](https://aclanthology.org/2023.emnlp-main.398/)，EMNLP 2023 | 评估需分开流畅性、事实正确性、引用质量；“有引用”不保证引用支持陈述 | 分开验证 ID/URL 合法性、事实支持、引用完整性；程序校验无法替代语义抽检。实际阅读的是论文官方页面摘要与元数据，未声称完成全文复现实验 |
 
-## 访问受限的资料
+## 接口兼容边界
 
-已尝试官方域名搜索及直接取得 OpenAI Docs 的 Structured Outputs、Retrieval、Prompt Caching 页面（`developers.openai.com/api/docs/guides/...`），返回 403；`platform.openai.com/docs/guides/structured-outputs` 也返回 403。官方域名搜索请求超时。SQLite FTS5 官方完整页面下载不完整。它们**不作为已核实的新 API 能力依据**。
+兼容服务在请求字段、结构化输出、usage、上下文和错误行为上可能存在差异。系统提供 Responses 与 Chat Completions 两种协议，以及提示词 JSON、JSON Object 和 JSON Schema 输出模式；启用时需验证所选组合。
 
-因此不承诺任意“OpenAI 兼容”服务支持 Responses、tools、JSON Schema、embedding、供应商缓存、Batch 或供应商幂等。基础设计采用可配置的 Chat Completions 消息请求；具体字段、上下文、输出限制、usage、结构化输出与工具能力需对实际 endpoint 做能力检查，兼容路径也需本机契约测试。没有提供 endpoint、model、密钥，未发起真实模型调用，也没有价格/延迟结论。
+供应商的工具调用、embedding、缓存、Batch 和幂等能力不作为基础工作流前提。调用预算以 token 和请求次数记账，金额、延迟及摘要质量需按实际模型单独评估。
 
-## 本地实现核对
+## 复用能力与设计约束
 
-| 已核对模块 | 可复用部分 | 必须补齐的地方 |
+| 模块 | 可复用部分 | 设计约束 |
 |---|---|---|
 | `internal/app/articles.go` / `search.go` | recent/archive/all，稳定 ID，分页，FTS，读正文不自动改阅读状态 | 普通分页没有冻结未读集合；晨报需独立成员快照。FTS 是文章级，不是片段级语义搜索 |
 | `internal/app/content.go` / `retention.go` | 有效正文过滤、hash、正文清理与索引一致、整理成果独立保存 | 分块、临时证据、向量也必须遵循有效期；不能复制全文到永久报告或缓存 |
-| `internal/app/jobs.go` / `internal/jobs/runner.go` | SQLite 任务、退避、租约、站点冷却、幂等 | 当前只有 feed/fulltext，非 feed 分支直接按 fulltext 执行；不能直接塞入 agent kind。模型执行需要独立有界队列、续租和 fencing |
+| `internal/app/jobs.go` / `internal/jobs/runner.go` | SQLite 任务、退避、租约、站点冷却、幂等 | feed/fulltext 与模型任务采用独立队列；模型执行使用有界并发、续租和 fencing |
 | `internal/http` / `docs/agent-api.md` | 同一业务层、OpenAPI、现有登录/token、幂等结果 | 不增加 Agent 权限系统；新增配置、报告、会话、查询接口复用入口 |
 | Svelte 阅读页 | `/?scope=all&article=<id>` 已有深链 | 引用由服务端依据文章 ID 生成；阅读报告不标已读，用户点击打开文章沿用阅读行为 |
 | 单进程 / SQLite / NAS 约束 | Go 服务与静态前端；原抓取网络并发 2 | 不加常驻模型、向量服务、Node 服务或新端口；模型任务不占满源抓取执行槽 |
@@ -50,7 +50,7 @@
 | 工作流与检索用 Go 直接实现 | 复用当前运维与事务，便于检查每一步与覆盖统计 | 第一阶段采用 |
 | 默认独立向量数据库 / Agent 框架 | 当前没有证明需要，增加 NAS 常驻负担和维护面 | 不采用为前置条件；语义增强经检索集评测后再选嵌入式实现 |
 
-## 仍需实际验证
+## 评估方法
 
 1. 实际兼容接口支持的字段、输出格式、usage、超时和拒答行为；不把成功返回 HTTP 200 当作格式/质量通过。
 2. 中文/英文、技术标识、跨语言同义问法、无答案及冲突证据的检索召回；先测词法，再比较向量/重排的实际增益和成本。
@@ -59,4 +59,4 @@
 5. 自动全文提取质量、失败与过期内容策略；报告必须披露未取得全文的条数，不假称已全文阅读。
 6. 标题/段落指令注入、编造 ID、错配证据、伪造 URL、重复网络执行和正文到期竞争。
 
-上述均为待执行验收，不是已完成验证。
+已完成的程序检查和仍待进行的召回、语义及规模评估分别记录在[实施记录](implementation.md)。

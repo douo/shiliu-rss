@@ -1,6 +1,6 @@
 # 文档索引
 
-更新：2026-10-16。文档描述当前源码，历史提案明确标注为已替代；真实实例地址、订阅及运维凭据不在仓库维护。
+文档按使用、开发和维护场景组织。首次使用从[项目 README](../README.md)开始。
 
 | 阅读目标 | 文档 | 维护边界 |
 |---|---|---|
@@ -14,10 +14,10 @@
 | 提示词及格式 | [agent-prompts.md](agent-prompts.md)、[schema](agent-schemas/) | 设计说明与样本；实际执行模板在 internal/agent/prompts |
 | 外部接口 | [agent-api.md](agent-api.md)、[OpenAPI](../api/openapi.yaml) | 网页和外部 Agent 共用业务规则，生成代码检查漂移 |
 | 本机运维与迁移 | [operations.md](operations.md) | 快照、导入、备份恢复、本机 Linux 验证 |
-| 正式部署 | [production.md](production.md) | 通用部署与升级流程；实例台账单独私有保存 |
+| 正式部署 | [production.md](production.md) | 配置、初始化、反向代理、升级与回退 |
 | 前端开发 | [web/README.md](../web/README.md) | 快捷键、布局、浏览器测试、安全与构建 |
-| 安全与仓库脱敏 | [security.md](security.md) | 私密文件边界、历史检查和凭据处理 |
+| 安全与敏感数据 | [security.md](security.md) | 凭据、配置、备份与仓库检查 |
 | 调研背景 | [research.md](research.md)、[agent-research.md](agent-research.md) | 有日期的参考资料，不作为现有功能证明 |
 | 规模实验 | [scale.json](validation/scale.json)、[搜索实验](../spikes/sqlite-search/README.md) | 合成工作负载及独立实验，不能外推生产性能 |
 
-更新需求时同步产品、决策和实际实现状态。更新检查结果时注明版本、环境和未覆盖项；不要将旧截图、历史构建数字或小样本当成当前完整验收。模型效果、程序覆盖校验与正式实例正常访问分别记录。
+功能规则见产品需求，设计理由见决策记录，测试结果与已知限制见实施记录。

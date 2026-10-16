@@ -1,12 +1,12 @@
 # 技术选型
 
-日期：2026-10-15。状态：**首版已实现并完成本机验证；2026-10-16已正式部署NAS，正常健康观察见production.md。** 产品依据为 [v1.0 基线](product.md)。用户要求继续技术选型，并明确语言无偏好，以长期维护和低资源占用为准；下列具体组合由 Agent 据此选定，不冒称用户逐项确认过依赖。
+技术方案以长期维护、低资源占用和单进程部署为目标。产品范围见[产品需求](product.md)，实现验证见[实施记录](implementation.md)。
 
-本次 R-19–R-23 内置 Agent 按 [新设计](agent-design.md) 扩展同一技术栈；调研、兼容服务限制及未验证项见 [Agent调研](agent-research.md)。新模块的配置、晨报、对话及 API 已实现，实际验证与语义/规模限制见[实施记录](implementation.md)。
+内置 Agent 沿用同一技术栈，通过可配置 API 调用模型。执行与检索方案见 [Agent 设计](agent-design.md)，方案依据见[调研](agent-research.md)。
 
 ## 结论
 
-采用 **Go 模块化单体 + SQLite + Svelte 5 / TypeScript / SvelteKit 静态前端 + Tailwind CSS 4**。一个常驻应用进程承担静态资源、API 和有界后台任务；数据放 NAS 本地 SSD。开发、测试、构建都在本机；NAS 无需 Node.js 运行时、开发工具链或 APR。
+采用 **Go 模块化单体 + SQLite + Svelte 5 / TypeScript / SvelteKit 静态前端 + Tailwind CSS 4**。一个常驻应用进程承担静态资源、API 和有界后台任务，数据库放本地 SSD。运行环境无需 Node.js 或 Go 工具链。
 
 | 层 | 选择 | 目的与约束 |
 |---|---|---|
@@ -21,9 +21,9 @@
 | 显式全文 | `codeberg.org/readeck/go-readability/v2` + `microcosm-cc/bluemonday` | 对已经下载的 HTML 提取正文并净化；不启用浏览器或主动补抓 |
 | 调度 | 进程内定时器 + SQLite 持久任务/租约 | 工作可恢复，空闲不忙等；不用外部 cron 承担核心调度 |
 | 运行 | 单个 Docker 容器、现有 nginx、LAN/VPN | 复用 NAS 运维方式；应用数据独立，不依赖 Miniflux PostgreSQL |
-| 验证 | Go 测试、真实 SQLite/PostgreSQL 集成测试、svelte-check、Playwright | 优先验证 A01–A10；全部在本机，NAS 部署后做健康确认和正常负载观察 |
+| 验证 | Go 测试、真实 SQLite/PostgreSQL 集成测试、svelte-check、Playwright | 覆盖阅读、数据生命周期、持久任务、迁移和 Agent 工作流 |
 
-## 为什么选 Go，Rust 怎么样
+## 后端语言取舍
 
 Rust 是可行的正式备选，功能库没有构成阻碍。这里比较的是本项目的实现与维护取舍，**没有做 Go/Rust 的同负载性能或功耗对测**。
 
@@ -36,7 +36,7 @@ Rust 是可行的正式备选，功能库没有构成阻碍。这里比较的是
 | SQLite | 选 pure Go 驱动；与原生 SQLite 的性能差异需测量 | rusqlite 可绑定打包的 SQLite；跨平台构建要处理 C 工具链，或使用其他驱动 |
 | 本项目结论 | **首选：优先控制长期维护成本** | 如果实测资源预算持续不达标，或维护者形成 Rust 偏好，重新评估 |
 
-134 个源每 4–6 小时检查，平均每天约 536–804 次常规检查。主要工作是等待网络和短时解析；条件请求、错峰、有界并发及 SSD 上的批量写入比语言排名更能指导当前设计。这个估算不含失败重试和手动获取，也不能换算为实际瓦数。Go 的选择不意味着它比 Rust 更省电。
+以 200 个源每 4–6 小时检查估算，每天约 800–1,200 次常规检查。主要工作是等待网络和短时解析；条件请求、错峰、有界并发及 SSD 上的批量写入比语言排名更能指导当前设计。这个估算不含失败重试和手动获取，也不能换算为实际瓦数。Go 的选择不意味着它比 Rust 更省电。
 
 Rust 对应后端可以是 Axum/Tokio + reqwest + rusqlite + feed-rs + dom_smoothie + ammonia，API 可用 utoipa；同样可以服务选定的 Svelte 静态前端。已核对这些项目的能力；未构建 Rust 应用或验证提取效果。全文提取对具体网站的质量，两种语言都要用同一组样本验证。参考：[Axum](https://github.com/tokio-rs/axum)、[rusqlite](https://github.com/rusqlite/rusqlite)、[feed-rs](https://docs.rs/feed-rs/latest/feed_rs/)、[dom_smoothie](https://github.com/niklak/dom_smoothie)、[ammonia](https://docs.rs/ammonia/latest/ammonia/)、[utoipa](https://docs.rs/utoipa/latest/utoipa/)。
 
@@ -49,7 +49,7 @@ Python/FastAPI 也能满足当前吞吐，未选它是为了统一构建产物�
 | SQLite 或现有 PostgreSQL | SQLite | 单人、少量并发写可用短事务处理；独立于旧系统生命周期。PostgreSQL 已存在但仍有数据库角色、升级、备份和常驻服务维护成本 |
 | 纯 Go 或 C SQLite 驱动 | 先 pure Go | 本机 ARM 开发、J1900 AMD64 部署更方便；如果分析证明驱动是瓶颈，先替换适配器，不重写产品 |
 | FTS5 或独立搜索 | FTS5 | 事务一致、部署简单；内置Agent先复用词法检索，语义向量/重排作为经过召回评测的可选增强，不引入独立搜索集群 |
-| SSR、htmx 或现代静态前端 | SvelteKit 静态 SPA | 用户要求现代 Web 技术；有状态阅读交互由组件承担，同时避免在 NAS 再运行 JS 服务 |
+| SSR、htmx 或现代静态前端 | SvelteKit 静态 SPA | 有状态阅读交互由组件承担，同时避免在 NAS 再运行 JS 服务 |
 | 定时器或 cron | 定时器 + 持久状态 | 需要按源下一次时间、手动合并、失败恢复、重启接续；单纯 cron 不涵盖这些状态 |
 | REST 或 GraphQL/MCP | REST + OpenAPI | Agent 可直接用 HTTP；以后 MCP 适配器复用 API，不先维护多套入口 |
 
@@ -77,27 +77,26 @@ FTS5 使用 `content=''` 和 `contentless_delete=1`，不另存一份完整可�
 
 已实证默认 unicode61 不能命中连续中文内部的两字词，而 trigram 的 MATCH 无法处理不足三字符的词，所以不采用“默认分词即可”或短词全库 LIKE 扫描。上述索引方式先验证语义，再用规模测试检验体积与性能。机制参考：[SQLite FTS5](https://sqlite.org/fts5.html)。
 
-## 版本与已经完成的验证
+## 版本与依赖
 
-| 项目 | 2026-10-15 验证结果 | 使用方式 |
+| 工具或依赖 | 固定版本 | 位置 |
 |---|---|---|
-| Go | 官方当前稳定补丁 1.27.2；本机原有 1.26.4 | 实验使用自动下载的 1.27.2；未更改全局 Homebrew 安装。开发基线 1.27.2 |
-| modernc SQLite | `go list -m ...@latest` 得到 v1.60.1；实际运行 SQLite 3.53.4 | 已锁在实验 go.mod/go.sum；保留其要求的 libc v1.77.1，不独立漂移升级 |
-| oapi-codegen | 查询得到 v2.8.0；发布说明已支持 OpenAPI 3.1 | 已固定该版本，生成产品接口并检查漂移。严格类型不等于自动完成权限、业务或全部 schema 校验 |
-| 前端版本候选 | Svelte 5.57.2、SvelteKit 3.1.0、adapter-static 4.0.0、Vite 8.3.4、vite-plugin-svelte 7.3.1、TypeScript 6.0.3 | npm 版本及主要 peer 范围已核对；Kit 要求 TS ^6，不使用查询到的最新 TS 7.0.2。已完成完整静态构建、类型检查和浏览器验证 |
-| Tailwind | tailwindcss 与 @tailwindcss/vite 当前同为 4.3.3 | 已在产品锁文件固定配套版本，Typography 组合构建通过 |
-| 中文搜索与清理 | 本机实际驱动测试通过 | 覆盖两字/单字、中英混排、顺序、字面查询转义、正文清理、保留整理成果、事务回滚 |
-| 目标平台 | Linux/AMD64、`GOAMD64=v1`、`CGO_ENABLED=0` 交叉编译验证 | 该行记录早期实验兼容性；后续成品已本机验证并部署，仍不代表功耗达标 |
+| Go | 1.27.2 | `go.mod` |
+| Node / pnpm | 24.22.0 / 11.0.9 | `web/package.json` |
+| modernc SQLite | v1.60.1；配套 libc v1.77.1 | `go.mod` / `go.sum` |
+| oapi-codegen | v2.8.0 | `scripts/generate` |
+| Svelte / SvelteKit | 5.57.2 / 3.1.0 | `web/package.json` / `web/pnpm-lock.yaml` |
+| Tailwind CSS | 4.3.3 | `web/package.json` / `web/pnpm-lock.yaml` |
 
-可重现证据见 [SQLite 搜索实验](../spikes/sqlite-search/README.md)。Go 版本依据 [官方发布记录](https://go.dev/doc/devel/release)，驱动依据 [modernc 文档](https://pkg.go.dev/modernc.org/sqlite)，API 工具依据 [v2.8.0 发布说明](https://github.com/oapi-codegen/oapi-codegen/releases/tag/v2.8.0)。
+依赖和生成器随锁文件维护，运行镜像基础层固定 AMD64 digest。项目通过 pnpm runtime 使用固定 Node 版本，不要求替换系统全局 Node。具体构建参数见 Makefile、前端配置和 `deploy/Dockerfile`。
 
-应用依赖已固定在根 go.mod/go.sum 与 web/pnpm-lock.yaml；Go 1.27.2、Node 24.22.0、pnpm 11.0.9。pnpm 项目 runtime 实际运行 Node24，不更改全局Node26；入口可能显示全局 engines 警告，脚本实际版本已验证。生成器固定，运行镜像固定AMD64 digest，详见 deploy/Dockerfile；不使用浮动 latest 部署。
+中文索引的独立可重现验证见 [SQLite 搜索实验](../spikes/sqlite-search/README.md)，应用集成与浏览器结果见[实施记录](implementation.md)。
 
-实现资料：[gofeed](https://github.com/mmcdole/gofeed)、[go-readability](https://github.com/go-shiori/go-readability)、[bluemonday](https://github.com/microcosm-cc/bluemonday)、[goose](https://github.com/pressly/goose)、[OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0.html)。
+实现资料：[gofeed](https://github.com/mmcdole/gofeed)、[go-readability v2](https://codeberg.org/readeck/go-readability)、[bluemonday](https://github.com/microcosm-cc/bluemonday)、[goose](https://github.com/pressly/goose)、[OpenAPI 3.1.0](https://spec.openapis.org/oas/v3.1.0.html)。
 
-## 资源预算与实施关口
+## 资源预算
 
-以下是**待验证的工程预算**，不是用户承诺，也不是已测结果。初始测试规模定为 200 个源、10 万条文章元数据、2 万条仍有正文的文章；测试数据包含中英文、长正文、异常 HTML，正文总量约 500 MiB。先用合成数据，真实私人内容不进入仓库。
+以下是**工程验收预算**，实际测量结果单独记录。初始测试规模定为 200 个源、10 万条文章元数据、2 万条仍有正文的文章；测试数据包含中英文、长正文、异常 HTML，正文总量约 500 MiB。先用合成数据，真实私人内容不进入仓库。
 
 | 指标 | 初始预算/判据 |
 |---|---|
@@ -108,11 +107,11 @@ FTS5 使用 `content=''` 和 `contentless_delete=1`，不另存一份完整可�
 | 可靠性 | 断网、429/503、无效源、进程终止/重启下通过 A01–A09；数据库断电耐久性与存储设备能力有关 |
 | 前端 | 首屏必需 CSS+JS 压缩传输合计预算 ≤ 150 KiB，不计文章及图片；设置/复杂弹窗按需加载，无外部字体/框架 CDN；以构建报告验证 |
 
-规模、性能、故障和恢复测试均在本机，包括本机 Linux 容器/虚拟机；本机结果不能直接换算成 J1900 指标。NAS 部署后仅做健康确认和正常使用下的内存/CPU/请求延迟观察，记录既有媒体/下载负载，不在 NAS 放测试数据、运行压测或故障注入。CPU 与内存是代理指标；真正判断省电需另行安排整机功耗测量，本轮没有这项数据。
+性能结果应注明硬件、数据规模和并发负载；本机 Linux 模拟环境的数据不能直接换算成目标设备指标。CPU 和内存只能作为资源代理指标，功耗需要整机测量；现有测量见[实施记录](implementation.md)。
 
 不达标先分析请求量、缓冲复制、索引、锁等待与 SQLite 驱动；若仍无法达到资源预算，再决定驱动或语言调整。不能仅用 hello-world 内存或合成搜索耗时证明整套阅读器的性能。
 
-上述首版本机实现阶段已完成，实际结果见 [实施验收](implementation.md)。本次内置Agent已完成设计、实现与本机验收；模型接口使用可配置兼容适配器，不预设具体供应商特性。真实Miniflux全量迁移和NAS部署已按追加授权执行，见production.md。模块和运行约束见 [架构设计](architecture.md)。
+模块和数据规则见[架构设计](architecture.md)，发布步骤见[部署指南](production.md)。
 
 ## 实现阶段兼容修订
 
