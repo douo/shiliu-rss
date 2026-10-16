@@ -13,6 +13,15 @@ import (
 
 const articleCols = `a.id,a.feed_id,f.title,a.title,a.url,a.author,a.published_at,a.first_seen_at,a.read_at,a.favorite,a.removed,a.note,a.tags,a.version,a.imported_at,a.protection_until,a.provenance,a.read_at_unknown,f.archive,f.read_days,f.unread_days`
 
+const articleOrderTime = `COALESCE(a.published_at,a.first_seen_at)`
+
+func articleDate(a Article) time.Time {
+	if a.PublishedAt != nil {
+		return *a.PublishedAt
+	}
+	return a.FirstSeenAt
+}
+
 func scanArticle(row scanner, now time.Time) (Article, bool, error) {
 	var a Article
 	var published, read, imported, protected sql.NullString
@@ -169,17 +178,18 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 			return out, ErrInvalid
 		}
 		p := strings.Split(string(raw), "|")
-		if len(p) != 2 {
+		if len(p) != 3 || p[0] != "published" {
 			return out, ErrInvalid
 		}
-		if _, e = strconv.ParseInt(p[1], 10, 64); e != nil {
+		if n, err := strconv.ParseInt(p[2], 10, 64); err != nil || n < 1 {
 			return out, ErrInvalid
 		}
-		if _, e = time.Parse(time.RFC3339Nano, p[0]); e != nil {
+		at, e := time.Parse(time.RFC3339Nano, p[1])
+		if e != nil {
 			return out, ErrInvalid
 		}
-		where = append(where, "(a.first_seen_at<? OR (a.first_seen_at=? AND a.id<?))")
-		args = append(args, p[0], p[0], p[1])
+		where = append(where, "("+articleOrderTime+"<? OR ("+articleOrderTime+"=? AND a.id<?))")
+		args = append(args, stamp(at), stamp(at), p[2])
 	}
 	if q.Query != "" {
 		_, e := searchQuery(q.Query)
@@ -214,7 +224,7 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 		}
 	}
 	args = append(args, q.Limit+1)
-	rows, e := s.Store.Read.QueryContext(ctx, `SELECT `+articleCols+` FROM articles a JOIN feeds f ON f.id=a.feed_id WHERE `+strings.Join(where, " AND ")+` ORDER BY a.first_seen_at DESC,a.id DESC LIMIT ?`, args...)
+	rows, e := s.Store.Read.QueryContext(ctx, `SELECT `+articleCols+` FROM articles a JOIN feeds f ON f.id=a.feed_id WHERE `+strings.Join(where, " AND ")+` ORDER BY `+articleOrderTime+` DESC,a.id DESC LIMIT ?`, args...)
 	if e != nil {
 		return out, e
 	}
@@ -236,7 +246,7 @@ func (s *Service) ListArticles(ctx context.Context, q ArticleQuery) (ArticlePage
 	if len(out.Items) > q.Limit {
 		out.Items = out.Items[:q.Limit]
 		last := out.Items[q.Limit-1]
-		out.NextCursor = base64.RawURLEncoding.EncodeToString([]byte(stamp(last.FirstSeenAt) + "|" + last.ID))
+		out.NextCursor = base64.RawURLEncoding.EncodeToString([]byte("published|" + stamp(articleDate(last)) + "|" + last.ID))
 	}
 	for i := range out.Items {
 		if e = s.loadContent(ctx, &out.Items[i], archives[i], false); e != nil {

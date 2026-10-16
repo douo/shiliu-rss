@@ -14,6 +14,7 @@
     onreport,
     onarticle,
     ontogglesidebar,
+    onreadchange = () => {},
     sidebarExpanded = true,
     sidebarLabel = '切换侧栏 (c)'
   }: {
@@ -22,6 +23,7 @@
     onreport: (id: string) => void;
     onarticle: (event: MouseEvent, articleId: string, reportId: string, anchor: string) => void;
     ontogglesidebar: () => void;
+    onreadchange?: () => void | Promise<void>;
     sidebarExpanded?: boolean;
     sidebarLabel?: string;
   } = $props();
@@ -164,6 +166,7 @@
     if (!report) return;
     const result = await api.agentMarkRead(report.id);
     notice = `已将 ${result.marked_read} 篇总结文章标为已读`;
+    await onreadchange();
     report = await api.agentRun(report.id);
   }
   async function control(action: 'cancel' | 'retry') {

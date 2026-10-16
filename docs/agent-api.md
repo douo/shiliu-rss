@@ -20,7 +20,7 @@
 `GET /articles?scope=all&limit=50` 返回 items、next_cursor、high_watermark。ID/游标序号都是字符串；列表不含正文，单篇用 `GET /articles/{id}`。近期 recent、归档 archive、全部 all 明确选择；归档不是删除。正文状态/有效截止由服务器返回，过期正文不会因尚未运行物理清理而继续可读或命中搜索。
 
 1. 首次扫描保存第一页的 `high_watermark`。
-2. 保持筛选参数，使用不透明 `next_cursor` 继续固定 `(first_seen_at,id)` keyset 扫描，空游标结束。
+2. 保持筛选参数，使用不透明 `next_cursor` 继续`(COALESCE(published_at,first_seen_at),id)` 倒序 keyset 扫描（发布时间优先；旧收录时间游标返回400，应重新从首页扫描），空游标结束。
 3. 从保存的高水位调用 `GET /changes?cursor=...&limit=50`，处理每项后持久化 `next_cursor`。可能重复看到对象，按 ID/version 合并。
 4. 变更只有对象引用/类型/版本，没有正文快照。按需重新读取当前对象；已删除对象返回 404。读到同游标表示暂时追平，之后继续轮询。
 

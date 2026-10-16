@@ -437,9 +437,12 @@ type Feed struct {
 	ReadDays      int64          `json:"read_days"`
 	SiteUrl       string         `json:"site_url"`
 	Title         string         `json:"title"`
-	UnreadDays    int64          `json:"unread_days"`
-	Url           string         `json:"url"`
-	Version       int64          `json:"version"`
+
+	// UnreadCount All unread articles for this feed, including hidden archive entries, excluding removed entries; independent of list filters and pagination.
+	UnreadCount int64  `json:"unread_count"`
+	UnreadDays  int64  `json:"unread_days"`
+	Url         string `json:"url"`
+	Version     int64  `json:"version"`
 }
 
 // FeedImportance defines model for Feed.Importance.

@@ -6,7 +6,7 @@ test.beforeAll(async () => {
     if (req.url === '/feed') {
       res.setHeader('Content-Type', 'application/rss+xml');
       res.end(
-        `<?xml version="1.0"?><rss version="2.0"><channel><title>本机合成订阅</title><link>${origin}</link><description>测试</description><item><guid>synthetic-${origin}</guid><title>本机阅读闭环 ${new URL(origin).port}</title><link>${origin}/article</link><description><![CDATA[<p>这是一篇合成 RSS 正文，全部内容仅用于本机验证。</p>]]></description></item></channel></rss>`
+        `<?xml version="1.0"?><rss version="2.0"><channel><title>本机合成订阅 ${new URL(origin).port}</title><link>${origin}</link><description>测试</description><item><guid>synthetic-${origin}</guid><title>本机阅读闭环 ${new URL(origin).port}</title><link>${origin}/article</link><description><![CDATA[<p>这是一篇合成 RSS 正文，全部内容仅用于本机验证。</p>]]></description></item></channel></rss>`
       );
     } else {
       res.setHeader('Content-Type', 'text/html');
@@ -62,11 +62,26 @@ test('real API: subscription → background ingestion → reading → full text 
     await page.getByRole('button', { name: '更新列表', exact: true }).click();
     await page.waitForTimeout(300);
   }
+  // Read the server total before opening, then verify the same badge follows state changes.
+  await page.getByRole('button', { name: '更新列表', exact: true }).click();
+  const mobile = info.project.name === 'mobile';
+  const sourceBadge = page
+    .getByRole('navigation', { name: '订阅源', exact: true })
+    .getByRole('button', { name: `本机合成订阅 ${new URL(origin).port}`, exact: true })
+    .locator('.unread-count');
+  if (mobile) await page.getByRole('button', { name: '打开导航', exact: true }).click();
+  await expect(sourceBadge).toHaveText('1');
+  if (mobile) await page.keyboard.press('Escape');
   await page
     .getByRole('heading', { name: `本机阅读闭环 ${new URL(origin).port}`, exact: true })
     .first()
     .click();
   await expect(page.getByText('这是一篇合成 RSS 正文，全部内容仅用于本机验证。')).toBeVisible();
+  await expect(sourceBadge).toHaveCount(0);
+  await page.getByRole('button', { name: '标为未读 (a)', exact: true }).click();
+  await expect(sourceBadge).toHaveText('1');
+  await page.getByRole('button', { name: '标为已读 (a)', exact: true }).click();
+  await expect(sourceBadge).toHaveCount(0);
   await page.getByRole('button', { name: '收藏文章 (s)', exact: true }).click();
   await expect(page.getByRole('button', { name: '取消收藏 (s)', exact: true })).toBeVisible();
   await page.getByRole('textbox', { name: '我的笔记', exact: true }).fill('本机验证笔记');

@@ -5,30 +5,43 @@
   let {
     label,
     heading = label,
+    appearance = 'text',
+    closeLabel = '关闭技术说明',
     children
-  }: { label: string; heading?: string; children: Snippet } = $props();
+  }: {
+    label: string;
+    heading?: string;
+    appearance?: 'text' | 'status';
+    closeLabel?: string;
+    children: Snippet;
+  } = $props();
   const id = $props.id();
   let trigger: HTMLButtonElement;
   let panel: HTMLDivElement;
   let opened = $state(false);
   let pinned = false;
+  let restoringFocus = false;
   let timer: ReturnType<typeof setTimeout>;
 
   function position() {
     if (!opened || !panel || !trigger) return;
     const rect = trigger.getBoundingClientRect();
+    const belowSpace = Math.max(0, innerHeight - rect.bottom - 20);
+    const aboveSpace = Math.max(0, rect.top - 20);
+    // Keep the trigger reachable even when touch synthesizes mouseenter before click.
+    panel.style.maxHeight = `${Math.min(560, Math.max(belowSpace, aboveSpace))}px`;
     const width = panel.offsetWidth;
     const height = panel.offsetHeight;
     panel.style.left = `${Math.max(12, Math.min(rect.left, innerWidth - width - 12))}px`;
     const below = rect.bottom + 8;
-    panel.style.top = `${Math.max(12, Math.min(below + height <= innerHeight - 12 ? below : rect.top - height - 8, innerHeight - height - 12))}px`;
+    panel.style.top = `${Math.max(12, belowSpace >= height ? below : rect.top - height - 8)}px`;
   }
   function show() {
     clearTimeout(timer);
-    if (!opened) {
+    if (!panel.matches(':popover-open')) {
       panel.showPopover();
-      opened = true;
     }
+    opened = true;
     position();
   }
   function hide() {
@@ -59,6 +72,7 @@
   <button
     bind:this={trigger}
     class="help-trigger"
+    class:status-trigger={appearance === 'status'}
     aria-label={label}
     aria-expanded={opened}
     aria-controls={id}
@@ -66,7 +80,9 @@
     popovertarget={id}
     onmouseenter={show}
     onmouseleave={leave}
-    onfocus={show}
+    onfocus={() => {
+      if (!restoringFocus) show();
+    }}
     onblur={leave}
     onclick={(event) => {
       event.preventDefault();
@@ -75,7 +91,11 @@
         pinned = true;
         show();
       }
-    }}><Info size={15} aria-hidden="true" /><span>{label}</span></button
+    }}
+    >{#if appearance === 'status'}<span class="health-dot" aria-hidden="true"></span>{:else}<Info
+        size={15}
+        aria-hidden="true"
+      /><span>{label}</span>{/if}</button
   >
 </span>
 <div
@@ -90,14 +110,24 @@
   onmouseenter={() => clearTimeout(timer)}
   onmouseleave={leave}
   onfocusout={leave}
-  ontoggle={(event) => {
-    opened = event.newState === 'open';
+  onbeforetoggle={(event) => {
+    // Native dismissal can restore focus to the trigger. That focus must not reopen
+    // this popover while another source's popover is opening.
+    if (event.newState === 'closed') {
+      restoringFocus = true;
+      queueMicrotask(() => {
+        restoringFocus = false;
+      });
+    }
+  }}
+  ontoggle={() => {
+    opened = panel.matches(':popover-open');
     if (!opened) pinned = false;
   }}
 >
   <div class="help-heading">
     <h3 id={`${id}-heading`}>{heading}</h3>
-    <button class="icon-button" aria-label="关闭技术说明" onclick={hide}><X size={16} /></button>
+    <button class="icon-button" aria-label={closeLabel} onclick={hide}><X size={16} /></button>
   </div>
   {@render children()}
 </div>
@@ -106,6 +136,7 @@
   .help-wrap {
     display: inline-flex;
     max-width: 100%;
+    flex-shrink: 0;
   }
   .help-trigger {
     display: inline-flex;
@@ -124,6 +155,25 @@
     color: var(--accent);
   }
   .help-trigger :global(svg) {
+    flex-shrink: 0;
+  }
+  .help-trigger.status-trigger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 32px;
+    min-height: 0;
+    padding: 0;
+    border-radius: 6px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .health-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warning);
     flex-shrink: 0;
   }
   .help-panel {
@@ -155,6 +205,15 @@
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 14px;
+  }
+  .help-panel .help-heading > .icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 30px;
+    width: 30px;
+    height: 30px;
+    padding: 0;
   }
   .help-panel :global(h4) {
     margin: 18px 0 6px;

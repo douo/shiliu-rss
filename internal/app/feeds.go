@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const feedCols = `id,url,title,site_url,COALESCE(category_id,''),paused,archive,interval_hours,read_days,unread_days,etag,last_modified,allow_host,last_attempt_at,last_success_at,next_check_at,error,version,importance`
+const feedCols = `id,url,title,site_url,COALESCE(category_id,''),paused,archive,interval_hours,read_days,unread_days,etag,last_modified,allow_host,last_attempt_at,last_success_at,next_check_at,error,version,importance,(SELECT count(*) FROM articles WHERE feed_id=feeds.id AND read_at IS NULL AND removed=0)`
 
 type scanner interface{ Scan(...any) error }
 
@@ -14,7 +14,7 @@ func scanFeed(row scanner) (Feed, error) {
 	var f Feed
 	var attempt, success sql.NullString
 	var next string
-	e := row.Scan(&f.ID, &f.URL, &f.Title, &f.SiteURL, &f.CategoryID, &f.Paused, &f.Archive, &f.IntervalHours, &f.ReadDays, &f.UnreadDays, &f.ETag, &f.LastModified, &f.AllowHost, &attempt, &success, &next, &f.Error, &f.Version, &f.Importance)
+	e := row.Scan(&f.ID, &f.URL, &f.Title, &f.SiteURL, &f.CategoryID, &f.Paused, &f.Archive, &f.IntervalHours, &f.ReadDays, &f.UnreadDays, &f.ETag, &f.LastModified, &f.AllowHost, &attempt, &success, &next, &f.Error, &f.Version, &f.Importance, &f.UnreadCount)
 	f.LastAttemptAt = ptrTime(attempt)
 	f.LastSuccessAt = ptrTime(success)
 	f.NextCheckAt = parse(next)

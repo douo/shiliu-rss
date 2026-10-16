@@ -30,6 +30,7 @@ type Feed struct {
 	IntervalHours int        `json:"interval_hours"`
 	ReadDays      int        `json:"read_days"`
 	UnreadDays    int        `json:"unread_days"`
+	UnreadCount   int64      `json:"unread_count"`
 	ETag          string     `json:"-"`
 	LastModified  string     `json:"-"`
 	AllowHost     string     `json:"allow_host"`

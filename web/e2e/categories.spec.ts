@@ -20,6 +20,7 @@ async function mockCategories(page: Page, stale = false) {
     interval_hours: 5,
     read_days: 7,
     unread_days: 30,
+    unread_count: 0,
     next_check_at: now,
     last_attempt_at: null,
     last_success_at: null,

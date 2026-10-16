@@ -47,7 +47,7 @@ func TestUpgradeBacksUpPriorVersionAndKeepsData(t *testing.T) {
 	}
 	defer s.Close()
 	version, _, e := schemaVersion(ctx, s.Read)
-	if e != nil || version != 3 {
+	if e != nil || version != 4 {
 		t.Fatal(version, e)
 	}
 	var title string

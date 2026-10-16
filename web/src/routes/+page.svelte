@@ -23,6 +23,7 @@
   import Reader from '../lib/Reader.svelte';
   import AgentWorkspace from '../lib/AgentWorkspace.svelte';
   import FeedIcon from '../lib/FeedIcon.svelte';
+  import SidebarFeed from '../lib/SidebarFeed.svelte';
   import { modal } from '../lib/modal';
   import { api, APIError } from '../lib/api';
   import type { Article, ArticlePatch, Feed, Category } from '../lib/models';
@@ -51,7 +52,13 @@
     sidebarCollapsed = $state(false),
     sourceFilter = $state(''),
     categoriesOpen = $state(false),
-    feedsOpen = $state(true);
+    feedsOpen = $state(true),
+    expandedCategories = $state<Record<string, boolean>>({});
+  const categoryFeeds = $derived.by(() => {
+    const groups: Record<string, Feed[]> = {};
+    for (const feed of feeds) (groups[feed.category_id] ||= []).push(feed);
+    return groups;
+  });
   const visibleFeeds = $derived(
     feeds.filter((feed) =>
       `${feed.title} ${categories.find((c) => c.id === feed.category_id)?.title || ''}`
@@ -87,6 +94,7 @@
     articles = [];
     feeds = [];
     categories = [];
+    expandedCategories = {};
     agentView = true;
     reportID = '';
     reportAnchor = '';
@@ -344,6 +352,7 @@
       articles = articles.map((a) =>
         a.id === updated.id ? { ...a, ...updated, content: undefined, artifacts: undefined } : a
       );
+      if (Object.hasOwn(value, 'read')) void sources().catch(handleError);
     } catch (e) {
       handleError(e);
       if (e instanceof APIError && e.status === 412 && selected?.id === target.id)
@@ -369,6 +378,7 @@
     } catch (e) {
       handleError(e);
     } finally {
+      if (epoch === sessionEpoch) void sources().catch(handleError);
       busy = false;
     }
   }
@@ -439,6 +449,7 @@
     )
       return;
     if (e.key === 'Escape') {
+      if (document.querySelector(':popover-open')) return;
       if (unfavoriteTarget) unfavoriteTarget = null;
       else if (shortcutOpen) shortcutOpen = false;
       else if (navOpen) navOpen = false;
@@ -450,7 +461,12 @@
       e.preventDefault();
       return;
     }
-    if (shortcutOpen || unfavoriteTarget || document.querySelector('[aria-modal="true"]')) return;
+    if (
+      shortcutOpen ||
+      unfavoriteTarget ||
+      document.querySelector('[aria-modal="true"], :popover-open')
+    )
+      return;
     // These keys are unused by Vimium's default mappings, including sequence prefixes.
     if (e.key === 'c') {
       if (!e.repeat) toggleSidebar();
@@ -714,11 +730,54 @@
             >
           </div>
           {#if categoriesOpen}<nav id="sidebar-categories" aria-label="分类">
-              {#each categories as category}<button
-                  class:chosen={!agentView && categoryID === category.id}
-                  onclick={() => navigate('all', { category: category.id })}
-                  ><span class="category-dot"></span><span>{category.title}</span></button
-                >{/each}
+              {#each categories as category (category.id)}
+                {@const children = categoryFeeds[category.id] || []}
+                <div class="category-branch">
+                  <div class="category-row">
+                    <button
+                      class="category-toggle"
+                      aria-label={`${expandedCategories[category.id] ? '收起' : '展开'}分类：${category.title}`}
+                      aria-expanded={!!expandedCategories[category.id]}
+                      aria-controls={`category-feeds-${category.id}`}
+                      onclick={() => {
+                        expandedCategories = {
+                          ...expandedCategories,
+                          [category.id]: !expandedCategories[category.id]
+                        };
+                      }}
+                      ><ChevronRight
+                        size={13}
+                        class={expandedCategories[category.id] ? 'expanded' : ''}
+                      /></button
+                    >
+                    <button
+                      class="category-link"
+                      class:chosen={!agentView && categoryID === category.id}
+                      aria-label={category.title}
+                      title={category.title}
+                      aria-current={!agentView && categoryID === category.id ? 'page' : undefined}
+                      onclick={() => navigate('all', { category: category.id })}
+                      ><span>{category.title}</span><small aria-hidden="true"
+                        >{children.length}</small
+                      ></button
+                    >
+                  </div>
+                  {#if expandedCategories[category.id]}
+                    <nav
+                      id={`category-feeds-${category.id}`}
+                      class="category-feeds"
+                      aria-label={`${category.title}下的订阅源`}
+                    >
+                      {#each children as feed (feed.id)}<SidebarFeed
+                          {feed}
+                          selected={!agentView && feedID === feed.id}
+                          onselect={(id) => navigate('all', { feed: id })}
+                        />
+                      {:else}<p class="nav-empty">此分类暂无订阅源</p>{/each}
+                    </nav>
+                  {/if}
+                </div>
+              {/each}
             </nav>{/if}
         </div>
         <div class="nav-section-heading">
@@ -744,15 +803,11 @@
             /></label
           >
           <nav id="sidebar-feeds" aria-label="订阅源" class="source-nav">
-            {#each visibleFeeds as feed}<button
-                class:chosen={!agentView && feedID === feed.id}
-                onclick={() => navigate('all', { feed: feed.id })}
-                title={feed.title}
-                ><FeedIcon {feed} /><span>{feed.title || '未命名订阅'}</span>{#if feed.error}<span
-                    class="health-dot"
-                    title="最近抓取失败"
-                  ></span>{/if}</button
-              >{/each}
+            {#each visibleFeeds as feed (feed.id)}<SidebarFeed
+                {feed}
+                selected={!agentView && feedID === feed.id}
+                onselect={(id) => navigate('all', { feed: id })}
+              />{/each}
             {#if !feeds.length}<button onclick={() => showSettings()}
                 ><Rss size={15} />添加第一个订阅</button
               >{:else if !visibleFeeds.length}<p class="nav-empty">没有匹配的订阅</p>{/if}
@@ -785,6 +840,7 @@
             anchor={reportAnchor}
             onreport={chooseReport}
             onarticle={reportArticle}
+            onreadchange={sources}
             ontogglesidebar={toggleSidebar}
             sidebarExpanded={isMobile ? navOpen : !sidebarCollapsed}
             sidebarLabel={isMobile ? (navOpen ? '关闭导航' : '打开导航') : '切换侧栏 (c)'}
@@ -873,8 +929,13 @@
             >
           </div>
           <div class="list-actions">
-            <button class="icon-button" onclick={() => list()} aria-label="更新列表"
-              ><RefreshCw size={16} class={loading ? 'spin' : ''} /></button
+            <button
+              class="icon-button"
+              onclick={() => {
+                void sources().catch(handleError);
+                void list();
+              }}
+              aria-label="更新列表"><RefreshCw size={16} class={loading ? 'spin' : ''} /></button
             ><button class="text-button" disabled={busy || !unread} onclick={bulkRead}
               ><CheckCheck size={16} /><span>本页标为已读</span></button
             >
