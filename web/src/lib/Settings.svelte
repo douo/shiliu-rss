@@ -411,7 +411,7 @@
           /><label for="feed-allow-host">允许访问的内网主机（可选）</label><input
             id="feed-allow-host"
             bind:value={editing.allow_host}
-            placeholder="例如：192.0.2.20（只授权此主机）"
+            placeholder="例如：feeds.internal.example（只授权此主机）"
           /><label for="feed-title">名称</label><input
             id="feed-title"
             bind:value={editing.title}

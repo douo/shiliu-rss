@@ -2,7 +2,7 @@
 
 日期：2026-10-15。状态：**首版已实现并完成本机验证；2026-10-16已正式部署NAS，正常健康观察见production.md。** 产品依据为 [v1.0 基线](product.md)。用户要求继续技术选型，并明确语言无偏好，以长期维护和低资源占用为准；下列具体组合由 Agent 据此选定，不冒称用户逐项确认过依赖。
 
-本次 R-19–R-23 内置 Agent 按 [新设计](agent-design.md) 扩展同一技术栈；调研、兼容服务限制及未验证项见 [Agent调研](agent-research.md)。新模块尚未实现，不包含在首版已通过的结果中。
+本次 R-19–R-23 内置 Agent 按 [新设计](agent-design.md) 扩展同一技术栈；调研、兼容服务限制及未验证项见 [Agent调研](agent-research.md)。新模块的配置、晨报、对话及 API 已实现，实际验证与语义/规模限制见[实施记录](implementation.md)。
 
 ## 结论
 
@@ -87,7 +87,7 @@ FTS5 使用 `content=''` 和 `contentless_delete=1`，不另存一份完整可�
 | 前端版本候选 | Svelte 5.57.2、SvelteKit 3.1.0、adapter-static 4.0.0、Vite 8.3.4、vite-plugin-svelte 7.3.1、TypeScript 6.0.3 | npm 版本及主要 peer 范围已核对；Kit 要求 TS ^6，不使用查询到的最新 TS 7.0.2。已完成完整静态构建、类型检查和浏览器验证 |
 | Tailwind | tailwindcss 与 @tailwindcss/vite 当前同为 4.3.3 | 已在产品锁文件固定配套版本，Typography 组合构建通过 |
 | 中文搜索与清理 | 本机实际驱动测试通过 | 覆盖两字/单字、中英混排、顺序、字面查询转义、正文清理、保留整理成果、事务回滚 |
-| 目标平台 | Linux/AMD64、`GOAMD64=v1`、`CGO_ENABLED=0` 交叉编译验证 | 仅验证实验构建兼容性；不代表已经在 NAS 运行，也不是功耗测试 |
+| 目标平台 | Linux/AMD64、`GOAMD64=v1`、`CGO_ENABLED=0` 交叉编译验证 | 该行记录早期实验兼容性；后续成品已本机验证并部署，仍不代表功耗达标 |
 
 可重现证据见 [SQLite 搜索实验](../spikes/sqlite-search/README.md)。Go 版本依据 [官方发布记录](https://go.dev/doc/devel/release)，驱动依据 [modernc 文档](https://pkg.go.dev/modernc.org/sqlite)，API 工具依据 [v2.8.0 发布说明](https://github.com/oapi-codegen/oapi-codegen/releases/tag/v2.8.0)。
 

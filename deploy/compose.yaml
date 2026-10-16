@@ -23,7 +23,7 @@ services:
       - "127.0.0.1:${NAS_PORT:?Check actual NAS listeners and record a free port first}:8080"
     volumes:
       - ./data:/data
-      - /srv/backups/shiliu-rss:/backup
+      - ${SHILIU_BACKUP_PATH:?Set a private absolute backup directory on the host}:/backup
     tmpfs:
       - /tmp:size=16m,noexec,nosuid,nodev,mode=1777
     logging:

@@ -1,8 +1,8 @@
 # 首版架构
 
-日期：2026-10-15。状态：首版实现与本机验证已完成，2026-10-16已部署NAS并切换Miniflux，生产事实见production.md。遵守 [产品基线](product.md)；技术组合与取舍见 [技术选型](technology.md)。本文件规定模块边界和关键不变量，具体 SQL 在 migrations/，契约在 api/openapi.yaml，启动命令见 README/Makefile。
+日期：2026-10-15。状态：首版实现与本机验证已完成，2026-10-16已部署NAS并切换Miniflux，部署步骤见production.md。遵守 [产品基线](product.md)；技术组合与取舍见 [技术选型](technology.md)。本文件规定模块边界和关键不变量，具体 SQL 在 migrations/，契约在 api/openapi.yaml，启动命令见 README/Makefile。
 
-**本次架构增补：** R-19–R-23 将 Agent 从外部 API 调用方扩展为系统内置模块。完整新架构见 [Agent 系统设计](agent-design.md)，状态为设计稿，尚未增加实际SQL/OpenAPI或运行功能。下列首版的身份/scope描述记录既有实现，本次不据此新增 Agent 权限系统。
+**本次架构增补：** R-19–R-23 将 Agent 从外部 API 调用方扩展为系统内置模块。完整新架构见 [Agent 系统设计](agent-design.md)，配置、晨报、对话与 SQL/OpenAPI 均已实现。下列首版的身份/scope描述记录既有实现，本次不据此新增 Agent 权限系统。
 
 ## 一个进程，三类入口
 
@@ -17,13 +17,13 @@ flowchart TD
     App --> DB[(本地 SSD / SQLite)]
     App --> Fetch[受控抓取 / 解析 / 净化]
     Fetch --> Sources[RSS 源 / 显式全文及重要源晨报策略]
-    App --> Assistant[内置 Agent / 设计中]
+    App --> Assistant[内置 Agent]
     Assistant --> Model[可配置模型 API / 未配置停用]
 ```
 
 静态资源服务、API、后台工作在同一个 Go 进程。Svelte 页面在浏览器运行，与 Agent 调用同一 API；应用层负责事务、权限和产品规则，存储层负责 SQL，抓取适配器负责外部输入。NAS 没有 SvelteKit/Node 服务进程。
 
-当前代码采用 `cmd/reader`、`internal/{app,store,http,fetch,jobs}`、`migrations`、`api`、`web` 和 `tests`；初始按需要创建，不预建空目录或为每个实体制造一套抽象。领域类型与规则先放 app，遇到实际复用再提取。时钟、网络和事务边界可注入，便于验证重启、退避与到期行为。
+当前代码采用 `cmd/reader`、`internal/{app,store,http,fetch,jobs,importer,agent}`、`migrations`、`api`和 `web`；测试随相应模块维护，目录按需要创建，不预建空目录或为每个实体制造一套抽象。领域类型与规则先放 app，遇到实际复用再提取。时钟、网络和事务边界可注入，便于验证重启、退避与到期行为。
 
 `web/` 是 Svelte 5 + TypeScript + SvelteKit 工程，Tailwind CSS 4 编译样式，按需采用 shadcn-svelte。路由包括列表、阅读、归档、源设置与健康页；状态在组件或相关页面间管理，不复制服务端的过期/授权规则。后台响应给出正文状态和期限，前端据此显示并在期限到达或页面重新激活时重新核对。导航请求可取消，乐观已读/收藏支持失败回滚。
 
@@ -88,7 +88,7 @@ OpenAPI 3.1.0 为契约源；用 oapi-codegen 生成 Go 类型和标准 HTTP 严
 | notes / tags / read-state / favorites | 网页与授权 API 的操作共用事务；若某 token 未获相应 scope 则拒绝 |
 | retention-preview / health | 登录用户看清理影响和运行状态；普通 Agent token 不默认拥有策略管理权限 |
 
-稳定文章 ID 对外作为字符串，数据库内部可用不复用的整数主键。文章列表按 `(COALESCE(published_at,first_seen_at),id)` 倒序做 keyset 分页，优先发布时间；缺失时用收录时间，相同时间按ID倒序。游标带published版本，旧收录时间游标返回400并重新从首页读取；时间范围筛选仍基于first_seen_at。Feed接口unread_count统计全部未读含隐藏归档、排除removed，不受文章列表分页和筛选影响；Agent 批量同步先取得变更高水位、按稳定 ID 导出初始集合，再追 changes，允许重复处理但不因新文章插入漏项。changes 包含正文清理、内容更新和整理状态变更；纯时间流逝造成的日常隐藏不生成海量变更，增量消费范围始终包含归档，由截止时间表达可见性。普通搜索分页不承诺冻结可变排名快照。
+稳定文章 ID 对外作为字符串，数据库内部可用不复用的整数主键。文章列表按 `(COALESCE(published_at,first_seen_at),id)` 倒序做 keyset 分页，优先发布时间；缺失时用收录时间，相同时间按ID倒序。游标带published版本，旧收录时间游标返回400并重新从首页读取；时间范围筛选仍基于first_seen_at。Feed接口unread_count统计全部未读含隐藏归档、排除removed，不受文章列表分页和筛选影响；ArticlePage.unread_count按当前范围/源/分类/收藏/搜索/收录日期统计，忽略阅读标签与分页，并与该响应列表共用只读快照；Agent 批量同步先取得变更高水位、按稳定 ID 导出初始集合，再追 changes，允许重复处理但不因新文章插入漏项。changes 包含正文清理、内容更新和整理状态变更；纯时间流逝造成的日常隐藏不生成海量变更，增量消费范围始终包含归档，由截止时间表达可见性。普通搜索分页不承诺冻结可变排名快照。
 
 变更日志首版保留紧凑元数据，未来若压缩须明确 cursor 失效并要求全量重新同步，不能无声跳过。API 请求不跨分页持有数据库事务。写回用 Idempotency-Key + token 身份 + 操作组成唯一键，保存请求 hash 与结果引用；同键不同内容返回 409。摘要写入另有调用方稳定 external_id，防止重试窗口之后重复产物；任务重复由活动唯一约束合并。幂等键至少保留 30 天，此期限写入契约。
 
@@ -110,21 +110,21 @@ first_seen_at 优先源系统 created_at；确实缺失时用固定导入时间�
 
 以 `(source_instance,entity_type,source_id)` 去重，重跑同批不刷新 imported_at 或 30 天保护期。同步已有身份别名，使后续正常 RSS 轮询能匹配迁入条目；旧 ID 与新 GUID/URL 的映射冲突必须报告。迁移后正文统一净化并建立索引。
 
-先预览再导入，核对分类、订阅、文章、已读、收藏、关联、样本内容、时间兜底和不兼容配置；再运行重复导入与真实 feed 重抓去重验证。旧系统在演练期间照常运行；正式切换再安排稳定窗口/最终差量核对，未对齐期间不把新库当成唯一权威。此前阶段仅设计；后续已获授权并完成真实全量迁移，计数和差异见production.md。
+先预览再导入，核对分类、订阅、文章、已读、收藏、关联、样本内容、时间兜底和不兼容配置；再运行重复导入与真实 feed 重抓去重验证。旧系统在演练期间照常运行；正式切换再安排稳定窗口/最终差量核对，未对齐期间不把新库当成唯一权威。此前阶段仅设计；后续已获授权并完成真实全量迁移，通用切换与差异处理见production.md。
 
 ## 本机开发与 NAS 部署
 
 | 阶段 | 执行位置与产物 |
 |---|---|
 | 开发 | 本机 Go API 与 Vite 开发服务器；本机 SQLite，开发代理 `/api` 到 Go，使用脱敏/合成数据 |
-| 测试 | 本机 Go 集成测试、Vitest、svelte-check 和 Playwright；故障、重启、清理、导入和恢复演练均用本机测试库 |
+| 测试 | 本机 Go 集成测试、svelte-check 和 Playwright；故障、重启、清理、导入和恢复演练均用本机测试库 |
 | 构建 | 本机 pnpm 静态构建，再 Go 交叉编译 `linux/amd64`、`GOAMD64=v1`、`CGO_ENABLED=0`；本机打包镜像 |
 | 成品验证 | 本机 Linux 容器/虚拟机验证实际成品；Mac 原生测试不能代替 Linux 运行验证，AMD64 模拟运行不能代替 J1900 功耗实测 |
 | 部署 | NAS 接收固定版本镜像和运行配置，挂载持久数据；只确认健康、正常访问与运行资源，不承担开发/压力/故障测试 |
 
 本机已配置独立Colima/Lima Linux环境、Docker/Buildx CLI，实际AMD64镜像在本机Rosetta运行验证；不把构建转移到NAS。前端工具链用项目固定的 Node LTS/pnpm 与 lockfile；构建产物中只有发布用的二进制/静态资源，不带 node_modules、源码工具链和测试数据。
 
-端口分两个环境处理：**本机** API/Vite 首次配置通过本机 APR 分配并持久化，设置 agent.type=codex，不在每次启动调用 ensure；**NAS 没有 APR**，按用户明确的工作流，在部署时读取实际监听/容器映射和 NAS 台账，选定可用端口后固化到 Compose/nginx 并登记。本机 APR 不替 NAS 分配端口，也不为了这个项目向 NAS 安装 APR。本机APR已分配API41001/Vite41002，固化config/dev.env；NAS已核对并使用回环18082，由现有read域名反代。
+端口分两个环境处理：**本机** API/Vite 首次配置通过本机 APR 分配并持久化，设置 agent.type=codex，不在每次启动调用 ensure；**NAS 没有 APR**，按用户明确的工作流，在部署时读取实际监听/容器映射和 NAS 台账，选定可用端口后固化到 Compose/nginx 并登记。本机 APR 不替 NAS 分配端口，也不为了这个项目向 NAS 安装 APR。本机固定 API41001/Vite41002 于 config/dev.env；部署端口通过私有配置显式指定。
 
 ## 部署存储、备份与维护
 
@@ -132,7 +132,7 @@ first_seen_at 优先源系统 created_at；确实缺失时用固定导入时间�
 
 NAS 容器映射到主机回环地址，由 nginx 提供 LAN/VPN HTTPS 入口。不得直接套用现有 `docker-compose@` 的 restart 流程：该模板会拉镜像，升级和普通重启应区分。
 
-设计采用每日一次 SQLite 一致性备份，目标为另一块存储上的 `/srv/backups/shiliu-rss/`，最多保留 7 个成功版本；这是有轮换上限的恢复用途，不是开发中间备份。初始目标 RPO 24 小时、测试规模内 RTO 30 分钟，需演练验证。目的地权限仅运维用户可读，备份包含私密源信息和文章，不能纳入公开仓库。Btrfs 阵列备份覆盖系统 SSD 故障，不覆盖整机丢失，异地副本留给后续实际需要。
+设计采用每日一次 SQLite 一致性备份，目标为另一块存储上的 `SHILIU_BACKUP_PATH` 指定的专用目录，最多保留 7 个成功版本；这是有轮换上限的恢复用途，不是开发中间备份。初始目标 RPO 24 小时、测试规模内 RTO 30 分钟，需演练验证。目的地权限仅运维用户可读，备份包含私密源信息和文章，不能纳入公开仓库。Btrfs 阵列备份覆盖系统 SSD 故障，不覆盖整机丢失，异地副本留给后续实际需要。
 
 备份使用 SQLite 在线备份接口；首次实现验证所选驱动的封装，若使用 `VACUUM INTO` 则需测量完整复制开销并安排低负载窗口。不能只拷贝正在运行的主 .db 文件。生成完整备份后完整性校验、原子更名，再按上限轮换；失败不删除最近成功副本。恢复在本地演练，确认数据库/版本后先执行应有的生命周期清理再开放读取，避免旧备份重新暴露已过期正文。参考：[SQLite 在线备份](https://sqlite.org/backup.html)。
 

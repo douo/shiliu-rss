@@ -1,76 +1,73 @@
 # 拾流 RSS · Shiliu
 
-一个自托管的个人 RSS 阅读器：可靠后台更新，清爽阅读，按源保存，正式 Agent API。Go + SQLite 单进程，Svelte 5 / TypeScript / SvelteKit 静态前端，Tailwind CSS 4。图标使用 [抽象石榴 SVG](assets/icon.svg)。
+自托管的个人 RSS 阅读器，支持后台更新、按源保存、晨报与对话式 Agent。Go + SQLite 单进程，Svelte 5 / TypeScript / SvelteKit 静态前端，Tailwind CSS 4。图标为[抽象石榴 SVG](assets/icon.svg)。
 
-**首版及内置 Agent 已实现并完成本机验证（2026-10-16）。** 已正式部署到 NAS，并完成 Miniflux 全量迁移与入口切换。入口 **https://reader.example.com**，报告与对话在 **/agent**；详情见 [生产记录](docs/production.md)。已实现的功能及验证边界见 [实施验收记录](docs/implementation.md)。
+当前已实现 R-01–R-29，并完成本机功能验证及一次实际部署、Miniflux 全量迁移。最新验收为 60 项桌面/手机浏览器检查；模型语义质量、真实移动浏览器和目标设备性能仍有验证边界，见[实施记录](docs/implementation.md)。仓库只保留通用配置和脱敏文档。
 
 ## 本机启动
 
-需要 Go 自动工具链、pnpm 11.0.9；项目固定 Go 1.27.2、Node 24.22.0，pnpm 自动下载项目 Node，不更改全局 Node。首次准备：
+需要支持自动工具链的 Go、pnpm 11.0.9。项目固定 Go 1.27.2、Node 24.22.0；pnpm 下载项目运行时，不替换全局 Node。
 
 ```sh
 make setup
-make init
+make init    # 仅首次初始化，不覆盖已有账号
 make dev
 ```
 
-打开 **http://127.0.0.1:41002**。初始随机密码在本机 `.local/admin-password`，只有本机用户可读；登录无用户名。`make init` 仅在首次初始化时执行，不覆盖已有账号。本次已完成本机初始化，可以直接 `make dev`。
+打开 **http://127.0.0.1:41002**。登录无需用户名；随机初始密码在 `.local/admin-password`，文件仅本机用户可读。开发库为 `.local/reader.db`。
 
-API `41001`、Vite `41002` 是本机 APR 分配的固定端口，固化在 [config/dev.env](config/dev.env)，启动不再调用 ensure。开发库位于 `.local/reader.db`，所有私人内容、密码、数据库和备份都被 Git 忽略。源正文由后台抓取，普通公网源无需开放内网访问；测试或明确的内网源需在源设置填写允许的具体主机。
+固定开发端口为 API `41001` / Vite `41002`，保存在 [config/dev.env](config/dev.env)。换用端口时同时更新该文件并核对占用；启动不会自动重新分配。部署配置独立于开发配置。
 
-运行嵌入静态前端的单进程成品（与 dev 二选一）：
+运行嵌入前端的单进程成品（与 dev 二选一）：
 
 ```sh
 make run
 ```
 
-打开 **http://127.0.0.1:41001**。本机 HTTP 使用非 Secure cookie；部署 HTTPS 必须设 `SHILIU_COOKIE_SECURE=true` 和准确的 `SHILIU_ORIGIN`，不信任任意转发头。
+打开 **http://127.0.0.1:41001**。本机 HTTP 使用非 Secure cookie；正式服务使用 HTTPS、准确的 `SHILIU_ORIGIN` 和 `SHILIU_COOKIE_SECURE=true`。
 
-## 已实现
+## 阅读与整理
 
-- RSS / Atom / JSON Feed、分类、OPML、源设置与健康；默认 5 小时 ±1 小时自动检查，条件请求、退避、持久任务/租约、重启恢复与同站限流。
-- 近期/未读/收藏/归档、中文及英文搜索、可折叠侧栏、来源图标与跳转、分类及成员管理、手机布局、↑/↓和避让 Vimium 默认映射的单键、笔记/标签/Agent 摘要。新内容提示后主动更新列表，保留阅读位置。
-- 隐藏与清正文分开；普通源 90 天、收藏及长期源豁免、迁入正文 30 天保护；清理同时处理衍生文本和索引，普通轮询不会填回已清正文。
-- 显式全文获取及重要源晨报按策略自动补抓；失败保留已有内容。HTML 净化、出站地址检查、体积/并发限制、严格脚本 CSP、gzip 静态资源。
-- 本人密码/会话、独立可撤销 scoped token、稳定分页、增量 changes、事务幂等、版本与内容依据冲突检查。
-- Miniflux 2.3.0 一致快照导出、预览/对账/可重试导入；一致备份/恢复、升级前备份、Linux AMD64 成品与部署模板。
+- RSS / Atom / JSON Feed、分类、OPML；默认每 5 小时检查并加入抖动，支持条件请求、退避、持久任务和重启续作。
+- 首页晨报，近期、收藏、归档与搜索共用侧栏。文章按发布时间倒序；分类可展开源，源显示全量未读及异常详情。源/分类列表顶部可查看详情并直接编辑。
+- 列表未读标签按完整筛选范围统计，不受分页或阅读标签影响。“本页标为已读”仅操作已加载条目；晨报末尾可标读该报告已实际总结的文章。
+- 正文、笔记、标签和 Agent 摘要分别保留。普通正文 90 天清理，收藏/长期源豁免；迁入正文有 30 天保护。日常隐藏不等于已读或删除。
+- 显式全文获取、危险 HTML 清理、出站地址检查、严格脚本 CSP、gzip 静态资源。
+- 可撤销 API token、分页与 changes 增量、幂等写回及版本/内容依据冲突检查。
 
-## Agent 配置
+桌面快捷键：`↑/↓` 导航，`c` 侧栏，`a` 已读，`s` 收藏，`e` 原文，`q` 搜索，`Esc` 返回。分配避让 Vimium 默认映射；输入、弹窗和表单内保留原生操作，自定义扩展映射仍可能冲突。
 
-在「设置 → Agent」填写 Base URL、协议、模型名和 API Key，再启用。未配置时停用。支持 OpenAI 兼容 Responses / Chat Completions；Key 只写不回显，留空保留，或通过 `SHILIU_AGENT_API_KEY_FILE` 提供受保护文件。默认每天北京时间 08:00 汇总全部未读（含归档），来源可设重要/普通/次要；重要源完整处理，其他源有界截取。
+## Agent
 
-侧栏「Agent」打开 `/agent`，查看报告、覆盖明细和会话。引用打开系统内文章；全文失效不用于检索。每日 token/调用预算、续作和运行时限可配置；RAG 使用有界全文词法检索，尚无语义向量与重排。
+在「设置 → Agent 配置」填写 Base URL、协议、模型和 API Key，再启用。未配置时停用。支持 OpenAI 兼容 Responses / Chat Completions；Key 只写不回显，留空保留，也可从 `SHILIU_AGENT_API_KEY_FILE` 指定的受保护文件读取。
 
-## 可重复验证
+默认每天 Asia/Shanghai 08:00 汇总全部未读（含归档）。重要源按全文处理并按策略补抓，普通/次要源有界截取；按分类、来源、重要度和未读量聚合，引用打开系统内部文章。返回正文前的晨报位置，或在右侧/底部围绕报告提问。
+
+日 token/调用预算、运行窗口及续作可配置。缺文、格式失败和预算不足明确显示覆盖缺口。对话使用有界词法 RAG；尚无语义向量、重排或任意工具执行器。外部系统可使用同一[Agent API](docs/agent-api.md)。
+
+## 验证与构建
 
 ```sh
-make check-generated  # OpenAPI → Go/TS 生成漂移
-make check            # go vet + Svelte/TypeScript
-make test             # Go race / SQLite / 抓取 / API / 调度 / 导入恢复
-make test-web         # 先停 dev/run；隔离临时库启动 Go 静态成品，42 项浏览器验收
+make check-generated  # OpenAPI → Go / TypeScript 生成漂移
+make check            # go vet + Svelte / TypeScript
+make test             # Go race 与集成测试
+make test-web         # 先停 dev/run；隔离库运行 60 项浏览器检查
 make build-linux      # 本机静态交叉编译 Linux AMD64 v1
+./scripts/check-privacy --history
 ```
 
-PostgreSQL 一致快照测试使用本机临时 Unix socket；本机已有 PostgreSQL 18.6 CLI。没有相应工具时该单项明确 skip，不能当作完整迁移验收。详见 [操作说明](docs/operations.md)。
+PostgreSQL 一致快照测试需要本机 PostgreSQL CLI；缺少时明确跳过该项，不算完整迁移验收。Linux 镜像运行检查和部署步骤见[操作说明](docs/operations.md)。合成规模数据见 [scale.json](docs/validation/scale.json)，不能用来宣称目标设备的性能或功耗达标。
 
-完整合成规模及维护演练：
+## 文档与部署
 
-```sh
-go run ./cmd/bench-reader -maintenance -output /tmp/shiliu-scale.json
-```
+从[文档索引](docs/README.md)按角色阅读：
 
-使用 200 个源、10 万文章、2 万正文（约 500 MiB HTML），临时库结束自动删除。已记录的本机结果见 [scale.json](docs/validation/scale.json)：列表 p95 0.657 ms、中文搜索 p95 31.8 ms，备份 10.09 秒、恢复 14.57 秒。它们是本机合成场景结果，**不是 NAS 性能、混合负载峰值内存或功耗结果**。
-
-## 文档与部署边界
-
-| 文档 | 内容 |
+| 内容 | 入口 |
 |---|---|
-| [产品需求](docs/product.md) | R-01–R-18、A01–A10、首版范围 |
-| [实施验收](docs/implementation.md) | 完成状态、实际检查、未验证事项 |
-| [技术选型](docs/technology.md) / [架构](docs/architecture.md) | 约束、版本、模块与不变量 |
-| [决策记录](docs/decisions.md) | 用户决定与实现中的兼容修订 |
-| [OpenAPI](api/openapi.yaml) / [Agent 接入](docs/agent-api.md) | 共享契约、scope、分页与幂等 |
-| [操作说明](docs/operations.md) | 导入、备份恢复、Linux 检查、部署准备 |
-| [前端说明](web/README.md) | 构建、键盘/手机交互、浏览器验证 |
+| 产品范围与验收场景 | [产品需求](docs/product.md)、[实施记录](docs/implementation.md) |
+| 技术、架构与决策 | [技术选型](docs/technology.md)、[架构](docs/architecture.md)、[决策](docs/decisions.md) |
+| Agent 设计与契约 | [系统设计](docs/agent-design.md)、[提示词](docs/agent-prompts.md)、[API](docs/agent-api.md)、[OpenAPI](api/openapi.yaml) |
+| 开发、迁移与运维 | [前端说明](web/README.md)、[操作说明](docs/operations.md)、[部署指南](docs/production.md) |
+| 敏感信息与发布边界 | [安全与脱敏](docs/security.md) |
 
-开发、测试、构建和恢复演练全部在本机。NAS 仅接收发布产物；部署时再核对实际占用、配置端口并登记 NAS 台账，不在 NAS 安装 APR。正式迁移采用独立数据库预览与对账，切换后保留 Miniflux 数据及回退依据。生产步骤见 [运行说明](docs/production.md)。
+开发、测试、构建和恢复演练在本机，NAS 仅接收已验证的发布产物。[部署模板](deploy/compose.yaml)要求显式配置镜像、HTTPS 地址、端口和备份目录。数据库、真实订阅、凭据、截图、日志和私有运维记录均不应提交；实际实例地址和存储布局不属于仓库配置。

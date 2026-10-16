@@ -1,4 +1,4 @@
-.PHONY: setup init dev run generate check-generated check test test-web build build-linux verify clean
+.PHONY: setup init dev run generate check-generated check test test-web build build-linux verify clean check-privacy
 setup:
 	go mod download
 	pnpm --dir web install --frozen-lockfile
@@ -32,3 +32,6 @@ build-linux:
 verify: check-generated check test build-linux
 clean:
 	rm -rf dist web/build web/.svelte-kit
+
+check-privacy:
+	./scripts/check-privacy --history

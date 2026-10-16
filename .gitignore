@@ -19,3 +19,27 @@ dist/
 *.db-wal
 *.db-shm
 *.db.lock
+
+# Private deployment configuration and exported data
+*.env
+!config/dev.env
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.ndjson
+*.dump
+*.sql.gz
+*.bundle
+*.tar
+*.tar.gz
+*.log
+# Private keys and authentication material
+*.pem
+*.key
+*.p12
+*.pfx
+.ssh/
+credentials.json

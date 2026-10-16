@@ -1,14 +1,14 @@
 # 内置 Agent 系统设计与实现
 
-更新：2026-10-15。R-19–R-23 的配置、晨报、对话、外部 API 已实现。调研依据见 [研究记录](agent-research.md)，实际验证和剩余质量评测见 [实施记录](implementation.md)。此文说明当前实现；模型摘要质量不等于程序覆盖校验。
+更新：2026-10-16。R-19–R-23 的配置、晨报、对话、外部 API 已实现。调研依据见 [研究记录](agent-research.md)，实际验证和剩余质量评测见 [实施记录](implementation.md)。此文说明当前实现；模型摘要质量不等于程序覆盖校验。
 
 ## 产品与入口
 
 一个活动模型配置、一个模型执行槽，和阅读器运行在同一个 Go 进程。未配置地址/模型或关闭开关时停用，已有文章、报告和对话仍可读取。模型调用不成为 RSS 抓取和普通阅读的必经路径。不增加角色、权限矩阵、Agent scopes 或审批；新接口复用现有会话或可撤销 token。
 
-侧栏的 Agent 进入 `/agent`，提供晨报、对话、模型配置；原设置页也有 Agent 配置。配置包含 Base URL、协议、原样使用的模型名、只写密钥、输出模式、上下文与输出限制、每天时间/时区、运行窗口及日 token/调用上限。Base URL 推荐填写包含 `/v1` 的 API 前缀；也兼容直接填 `/v1/responses` 或 `/v1/chat/completions`。
+首页及主侧栏“晨报 · Agent”提供晨报和对话；旧 `/agent` 深链跳转到同一首页工作区，模型配置在设置中。报告引用返回恢复位置，提问在右栏/底部展开。配置包含 Base URL、协议、原样使用的模型名、只写密钥、输出模式、上下文与输出限制、每天时间/时区、运行窗口及日 token/调用上限。Base URL 推荐填写包含 `/v1` 的 API 前缀；也兼容直接填 `/v1/responses` 或 `/v1/chat/completions`。
 
-Responses 使用 `instructions`、JSON 编码的 `input`、`stream:true`、`store:false`，解析 SSE 文本增量、结束状态和 usage。另支持流式 Chat Completions。输出模式默认提示词约束 JSON，也可显式选择 JSON Object / JSON Schema；不静默替换协议或模型。模型客户端直连配置的地址，符合本次 LAN 网关调用方式；不把凭据带到重定向位置。
+Responses 使用 `instructions`、JSON 编码的 `input`、`stream:true`、`store:false`，解析 SSE 文本增量、结束状态和 usage。另支持流式 Chat Completions。输出模式默认提示词约束 JSON，也可显式选择 JSON Object / JSON Schema；不静默替换协议或模型。模型客户端直连配置的地址，支持实例配置的服务地址；不把凭据带到重定向位置。
 
 Key 留空保留已有值；可明确清除。数据库文件权限为 0600，响应只含 `key_configured`；也支持服务端 `SHILIU_AGENT_API_KEY_FILE`，设置此变量时优先读取该文件。请求、认证头、原始正文和模型错误响应不写日志。模型错误只显示稳定状态码。
 
@@ -67,6 +67,7 @@ Agent 队列独立于 feed/fulltext 队列；一个模型槽，对话优先。�
 | `GET /runs?kind=report&before=...`、`GET /runs/{id}` | 历史元数据、任务/报告详情 |
 | `POST /runs/{id}/control` | `action=cancel/retry`，保留已完成步骤 |
 | `GET /reports/{id}/members?after=...&limit=...` | 固定成员与卡片，最多200项 |
+| `POST /reports/{id}/read` | 对已结束报告的实质摘要成员幂等标读，不包含失败提示或待处理成员 |
 | `PUT /reports/{id}/result` | 外部提交结构化报告；验证成员/hash/分组/内部引用，不能伪造覆盖数 |
 | `GET/POST /conversations` | 会话历史/新建，可关联 report_id |
 | `GET/POST /conversations/{id}/messages` | 消息分页/幂等发送 |
@@ -74,4 +75,4 @@ Agent 队列独立于 feed/fulltext 队列；一个模型槽，对话优先。�
 
 外部汇报先创建报告快照、取消内置执行，再提交 result；正在执行的 run 返回冲突。外部自报的阅读范围不认证为内置处理完成，报告标明外部/partial；覆盖数读取真实成员账本。系统字段重建，不接受伪造 URL 或组总数。
 
-用户已追加授权 NAS 部署与全量迁移/Miniflux 切换，执行见 production.md。Agent 模块范围不含推送、自动已读、多 Agent 协作、自动更换模型或新的权限系统。
+通用部署与迁移步骤见 [部署指南](production.md)。Agent 模块范围不含推送、自动已读、多 Agent 协作、自动更换模型或新的权限系统。
