@@ -176,6 +176,12 @@ export const api = {
         params: { path: { id }, query: { after, limit: 50 } }
       })
     ),
+  agentMarkRead: (id: string) =>
+    data(
+      client.POST('/api/v1/agent/reports/{id}/read', {
+        params: { path: { id }, header: { 'Idempotency-Key': crypto.randomUUID() } }
+      })
+    ),
   agentConversations: (before = '') =>
     data(client.GET('/api/v1/agent/conversations', { params: { query: { before } } })),
   agentConversation: (report_id?: string) =>

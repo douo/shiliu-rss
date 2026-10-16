@@ -21,6 +21,7 @@
     PanelLeftOpen
   } from '@lucide/svelte';
   import Reader from '../lib/Reader.svelte';
+  import AgentWorkspace from '../lib/AgentWorkspace.svelte';
   import FeedIcon from '../lib/FeedIcon.svelte';
   import { modal } from '../lib/modal';
   import { api, APIError } from '../lib/api';
@@ -71,6 +72,12 @@
     openGeneration = 0,
     sessionEpoch = 0;
   let sessionChannel: BroadcastChannel | undefined;
+  let agentView = $state(true),
+    reportID = $state(''),
+    reportAnchor = $state('');
+  let agentElement = $state<HTMLDivElement>();
+  let agentWorkspace = $state<{ refresh: () => Promise<void> }>();
+  let reportScroll = 0;
   function clearSession() {
     sessionEpoch++;
     openGeneration++;
@@ -80,6 +87,15 @@
     articles = [];
     feeds = [];
     categories = [];
+    agentView = true;
+    reportID = '';
+    reportAnchor = '';
+    reportScroll = 0;
+    try {
+      sessionStorage.removeItem('shiliu:report-return');
+    } catch {
+      /* Optional position. */
+    }
     settingsOpen = false;
     SettingsComponent = null;
     unfavoriteTarget = null;
@@ -122,14 +138,32 @@
       : '';
   }
   function syncURL(articleId?: string, replace = false) {
-    const p = new URLSearchParams(queryParams());
+    const p = new URLSearchParams(agentView ? { view: 'agent' } : queryParams());
     p.delete('limit');
+    if (agentView && reportID) p.set('report', reportID);
+    if (agentView && reportAnchor) p.set('anchor', reportAnchor);
     if (articleId) p.set('article', articleId);
     if (settingsOpen) p.set('settings', 'true');
     void goto(`/?${p}`, { shallow: true, replace, reset: false });
   }
   function readURL() {
     const p = new URLSearchParams(location.search);
+    agentView = p.get('view') === 'agent' || p.has('report') || !p.size;
+    reportID = p.get('report') || '';
+    reportAnchor = p.get('anchor') || '';
+    reportScroll = 0;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('shiliu:report-return') || 'null');
+      if (
+        saved?.report === reportID &&
+        saved?.anchor === reportAnchor &&
+        !/^(member|card)-/.test(reportAnchor) &&
+        saved?.width === innerWidth
+      )
+        reportScroll = saved.scroll;
+    } catch {
+      /* The URL anchor remains a fallback. */
+    }
     scope = ['recent', 'archive', 'all'].includes(p.get('scope') || '')
       ? p.get('scope')!
       : 'recent';
@@ -185,9 +219,9 @@
       await api.login(password);
       password = '';
       authenticated = true;
+      const id = readURL();
       await sources();
-      await list();
-      const id = new URLSearchParams(location.search).get('article');
+      if (!agentView) await list();
       if (id) await open(id, false);
     } catch (e) {
       handleError(e);
@@ -199,6 +233,9 @@
     nextScope: string,
     options: { favorite?: boolean; feed?: string; category?: string } = {}
   ) {
+    agentView = false;
+    reportID = '';
+    reportAnchor = '';
     scope = nextScope;
     favorite = options.favorite || false;
     feedID = options.feed || '';
@@ -220,6 +257,36 @@
     selected = null;
     syncURL();
     await list();
+  }
+  async function showAgent() {
+    openGeneration++;
+    agentView = true;
+    selected = null;
+    settingsOpen = false;
+    navOpen = false;
+    syncURL();
+  }
+  function chooseReport(id: string) {
+    if (reportID !== id) reportAnchor = '';
+    reportID = id;
+    if (!selected) syncURL(undefined, true);
+  }
+  async function reportArticle(e: MouseEvent, id: string, report: string, anchor: string) {
+    if (e.button || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    reportID = report;
+    reportAnchor = anchor;
+    reportScroll = agentElement?.scrollTop || 0;
+    try {
+      sessionStorage.setItem(
+        'shiliu:report-return',
+        JSON.stringify({ report, anchor, scroll: reportScroll, width: innerWidth })
+      );
+    } catch {
+      /* Position storage may be unavailable. */
+    }
+    syncURL(undefined, true);
+    await open(id);
   }
   async function open(id: string, push = true) {
     const generation = ++openGeneration;
@@ -247,6 +314,14 @@
     selected = null;
     syncURL();
     await tick();
+    if (agentView) {
+      if (agentElement && reportScroll) agentElement.scrollTop = reportScroll;
+      else if (reportAnchor)
+        document.getElementById(reportAnchor)?.scrollIntoView({ block: 'center' });
+      document.getElementById(reportAnchor)?.focus({ preventScroll: true });
+      void agentWorkspace?.refresh().catch(handleError);
+      return;
+    }
     if (listElement) listElement.scrollTop = scrollPosition;
     document
       .querySelector<HTMLButtonElement>(`[data-article-id="${articles[activeIndex]?.id}"]`)
@@ -379,7 +454,7 @@
     // These keys are unused by Vimium's default mappings, including sequence prefixes.
     if (e.key === 'c') {
       if (!e.repeat) toggleSidebar();
-    } else if (settingsOpen) return;
+    } else if (settingsOpen || (agentView && !selected)) return;
     else if (e.key === 'q') {
       navOpen = false;
       void (async () => {
@@ -428,8 +503,14 @@
     const pop = async () => {
       const id = readURL();
       selected = null;
-      await list();
+      if (!agentView) await list();
       if (id) await open(id, false);
+      else if (agentView) {
+        await tick();
+        if (agentElement && reportScroll) agentElement.scrollTop = reportScroll;
+        else document.getElementById(reportAnchor)?.scrollIntoView({ block: 'center' });
+        void agentWorkspace?.refresh().catch(handleError);
+      }
       if (settingsOpen) SettingsComponent = (await import('../lib/Settings.svelte')).default;
     };
     (async () => {
@@ -440,7 +521,7 @@
         authenticated = session.authenticated;
         if (authenticated) {
           await sources();
-          await list();
+          if (!agentView) await list();
           if (id) await open(id, false);
           if (settingsOpen) SettingsComponent = (await import('../lib/Settings.svelte')).default;
         }
@@ -520,7 +601,7 @@
       }
       if (!ready) {
         await sources();
-        await list();
+        if (!agentView) await list();
         if (settingsOpen) SettingsComponent = (await import('../lib/Settings.svelte')).default;
       }
     } catch (e) {
@@ -536,10 +617,9 @@
 </script>
 
 <svelte:head
-  ><title>{selected ? selected.title : settingsOpen ? '设置' : title} · 拾流 RSS</title><meta
-    name="description"
-    content="拾流 RSS，留住值得阅读的内容。"
-  /></svelte:head
+  ><title
+    >{selected ? selected.title : settingsOpen ? '设置' : agentView ? '晨报 · Agent' : title} · 拾流 RSS</title
+  ><meta name="description" content="拾流 RSS，留住值得阅读的内容。" /></svelte:head
 >
 <svelte:window
   onkeydown={keyboard}
@@ -596,17 +676,22 @@
         class="brand"
         onclick={(e) => {
           e.preventDefault();
-          navigate('recent');
+          showAgent();
         }}><img src="/icon.svg" alt="" /><span>拾流 <small>RSS</small></span></a
       >
       <nav aria-label="阅读导航" class="main-nav">
+        <button class:chosen={agentView && !settingsOpen} onclick={showAgent}
+          ><Rss size={18} />晨报 · Agent</button
+        >
         <button
-          class:chosen={scope === 'recent' && !favorite && !feedID && !categoryID}
+          class:chosen={!agentView && scope === 'recent' && !favorite && !feedID && !categoryID}
           onclick={() => navigate('recent')}><Inbox size={18} />近期文章</button
-        ><button class:chosen={favorite} onclick={() => navigate('all', { favorite: true })}
-          ><Star size={18} />我的收藏</button
-        ><button class:chosen={scope === 'archive' && !favorite} onclick={() => navigate('archive')}
-          ><Archive size={18} />归档</button
+        ><button
+          class:chosen={!agentView && favorite}
+          onclick={() => navigate('all', { favorite: true })}><Star size={18} />我的收藏</button
+        ><button
+          class:chosen={!agentView && scope === 'archive' && !favorite}
+          onclick={() => navigate('archive')}><Archive size={18} />归档</button
         >
       </nav>
       <div class="sidebar-library">
@@ -630,7 +715,7 @@
           </div>
           {#if categoriesOpen}<nav id="sidebar-categories" aria-label="分类">
               {#each categories as category}<button
-                  class:chosen={categoryID === category.id}
+                  class:chosen={!agentView && categoryID === category.id}
                   onclick={() => navigate('all', { category: category.id })}
                   ><span class="category-dot"></span><span>{category.title}</span></button
                 >{/each}
@@ -660,7 +745,7 @@
           >
           <nav id="sidebar-feeds" aria-label="订阅源" class="source-nav">
             {#each visibleFeeds as feed}<button
-                class:chosen={feedID === feed.id}
+                class:chosen={!agentView && feedID === feed.id}
                 onclick={() => navigate('all', { feed: feed.id })}
                 title={feed.title}
                 ><FeedIcon {feed} /><span>{feed.title || '未命名订阅'}</span>{#if feed.error}<span
@@ -674,7 +759,6 @@
           </nav>{/if}
       </div>
       <div class="sidebar-bottom">
-        <a class="button secondary compact" href="/agent">Agent</a>
         <button onclick={() => showSettings()} title="设置与授权" aria-label="设置与授权"
           ><Settings2 size={17} /></button
         >
@@ -690,6 +774,22 @@
       </div>
     </aside>
     <main class="main-pane">
+      {#if agentView}<div
+          class="agent-host"
+          bind:this={agentElement}
+          hidden={!!selected || settingsOpen}
+        >
+          <AgentWorkspace
+            bind:this={agentWorkspace}
+            reportId={reportID}
+            anchor={reportAnchor}
+            onreport={chooseReport}
+            onarticle={reportArticle}
+            ontogglesidebar={toggleSidebar}
+            sidebarExpanded={isMobile ? navOpen : !sidebarCollapsed}
+            sidebarLabel={isMobile ? (navOpen ? '关闭导航' : '打开导航') : '切换侧栏 (c)'}
+          />
+        </div>{/if}
       {#if settingsOpen && SettingsComponent}<SettingsComponent
           {feeds}
           {categories}
@@ -714,8 +814,9 @@
           {isMobile}
           onsource={sourceClick}
           sourceHref={sourceHref(selected.feed_id)}
+          returnToReport={agentView}
         />
-      {:else}<header class="page-header">
+      {:else if !agentView}<header class="page-header">
           <div class="page-heading">
             <button
               class="icon-button sidebar-toggle"
@@ -732,7 +833,7 @@
             <div>
               <h1>{title}</h1>
             </div>
-            <span class="article-count">{articles.length}{cursor ? '+' : ''} 篇</span>
+            <span class="article-count">已加载 {articles.length}{cursor ? '+' : ''} 篇</span>
           </div>
           <form class="search-box" role="search" onsubmit={search}>
             <Search size={17} /><input
@@ -759,7 +860,9 @@
                 read = 'false';
                 syncURL();
                 list();
-              }}>未读 <span>{unread}</span></button
+              }}
+              >未读 <span title="当前已加载文章中的未读数">{unread}{cursor ? '+' : ''}</span
+              ></button
             ><button
               class:chosen={read === 'true'}
               onclick={() => {

@@ -134,18 +134,26 @@ func (s *Service) AgentCounts(ctx context.Context, runID string) (map[string]int
 	if e != nil {
 		return nil, e
 	}
-	defer rows.Close()
 	for rows.Next() {
 		var state string
 		var n, full int
 		if e = rows.Scan(&state, &n, &full); e != nil {
+			rows.Close()
 			return nil, e
 		}
 		out[state] = n
 		out["total"] += n
 		out["fulltext"] += full
 	}
-	return out, rows.Err()
+	e = rows.Err()
+	rows.Close()
+	if e != nil {
+		return nil, e
+	}
+	var summarized, unread int
+	e = s.Store.Read.QueryRowContext(ctx, `SELECT count(*),COALESCE(sum(a.read_at IS NULL),0) FROM report_members m JOIN articles a ON a.id=m.article_id WHERE m.run_id=? AND a.removed=0 AND `+summarizedMember, runID).Scan(&summarized, &unread)
+	out["summarized_articles"], out["unread_summarized"] = summarized, unread
+	return out, e
 }
 func (s *Service) AgentGroups(ctx context.Context, runID string) ([]AgentGroup, error) {
 	rows, e := s.Store.Read.QueryContext(ctx, `WITH g AS (SELECT feed_id,feed_title,category_id,category_title,importance,count(*) AS total FROM report_members WHERE run_id=? GROUP BY feed_id) SELECT feed_id,feed_title,category_id,category_title,importance,total FROM g ORDER BY min(CASE importance WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END) OVER(PARTITION BY category_id),sum(total*CASE importance WHEN 'high' THEN 4 WHEN 'normal' THEN 2 ELSE 1 END) OVER(PARTITION BY category_id) DESC,category_id,CASE importance WHEN 'high' THEN 0 WHEN 'normal' THEN 1 ELSE 2 END,total DESC,feed_id`, runID)

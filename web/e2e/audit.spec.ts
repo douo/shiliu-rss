@@ -124,7 +124,7 @@ test('audit: logout in another tab clears an open reader immediately', async ({
   await page.goto('/?article=1');
   await expect(page.getByText('需要会话才能看到的正文', { exact: true })).toBeVisible();
   const second = await context.newPage();
-  await second.goto('/');
+  await second.goto('/?scope=recent');
   if (test.info().project.name === 'mobile')
     await second.getByRole('button', { name: '打开导航' }).click();
   await second.getByRole('button', { name: '退出登录', exact: true }).click();

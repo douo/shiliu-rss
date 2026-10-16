@@ -133,7 +133,7 @@ async function mock(
 }
 test('reading preserves list position, keyboard state, and deep links', async ({ page }, info) => {
   const items = await mock(page);
-  await page.goto('/');
+  await page.goto('/?scope=recent');
   await expect(page.getByRole('heading', { name: '近期文章', exact: true })).toBeVisible();
   const list = page.locator('.article-list');
   await list.evaluate((el) => (el.scrollTop = 550));
@@ -226,7 +226,7 @@ test('long source titles and reader metadata fit the viewport without hiding nav
   page
 }, info) => {
   await mock(page, { longMetadata: true });
-  await page.goto('/');
+  await page.goto('/?scope=recent');
   if (info.project.name === 'mobile')
     await page.getByRole('button', { name: '打开导航', exact: true }).click();
   await page
@@ -256,7 +256,7 @@ test('long source titles and reader metadata fit the viewport without hiding nav
 
 test('plain arrows follow list focus and single keys operate the reader', async ({ page }) => {
   const items = await mock(page);
-  await page.goto('/');
+  await page.goto('/?scope=recent');
   await page.locator('[data-article-id="5"]').focus();
   await page.keyboard.press('ArrowDown');
   await expect(page.locator('[data-article-id="6"]')).toBeFocused();
@@ -540,7 +540,7 @@ test('one scroll region keeps sources discoverable with 200 feeds and 20 categor
 }, info) => {
   await page.setViewportSize({ width: info.project.name === 'desktop' ? 1280 : 390, height: 480 });
   await mock(page, { manySources: true });
-  await page.goto('/');
+  await page.goto('/?scope=recent');
   if (info.project.name === 'mobile')
     await page.getByRole('button', { name: '打开导航', exact: true }).click();
   await expect(page.getByRole('button', { name: '分类 20', exact: true })).toHaveAttribute(
@@ -602,7 +602,7 @@ test('source links are separate from reading buttons and favicon failures fall b
       ).toString('base64')
     });
   });
-  await page.goto('/');
+  await page.goto('/?scope=recent');
   const link = page
     .locator('.article-row')
     .first()

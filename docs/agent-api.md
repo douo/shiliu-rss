@@ -52,9 +52,12 @@
 | GET `/runs`、GET `/runs/{id}` | 历史、进度及结果；模型任务返回202后轮询 |
 | POST `/runs/{id}/control` | cancel/retry；复用已完成步骤 |
 | GET `/reports/{id}/members` | 固定成员分页及处理深度/卡片 |
+| POST `/reports/{id}/read` | 当前已结束报告的实质摘要成员标已读；必需 Idempotency-Key，返回 marked_read；运行中409 |
 | PUT `/reports/{id}/result` | 外部结构化汇报；校验成员/hash/分组并重建内部引用 |
 | GET/POST `/conversations` | 会话列表与创建，可关联报告 |
 | GET/POST `/conversations/{id}/messages` | 历史与幂等消息 |
 | POST `/queries` | 无状态有界检索与查询 |
 
 外部汇报先建报告快照并取消内置执行；正在执行时拒绝覆盖。外部报告标记 partial，覆盖数由成员账本计算，不能自报已读全文。引用路径由服务端以文章 ID 构造，模型不能提供任意链接。文章、检索片段与用户引用资料均作为外部内容，不具有系统指令权。
+
+报告详情的 `result.counts` 从当前成员账本读取，新增 `summarized_articles`（存在事实/分析卡片的可阅读成员数）及 `unread_summarized`（其中当前仍未读数）。批量已读包含 summarized/reused 和有实质摘要的 fallback，排除仅 limitation 的格式失败卡片、pending、unavailable、removed；不改正文、收藏、笔记和标签。重复幂等键返回原结果，不覆盖操作后用户主动标回未读的决定；新一次显式操作可使用新键。外部只上传报告文本不认证逐篇卡片覆盖，因此不凭外部自报的引用扩大批量已读范围。

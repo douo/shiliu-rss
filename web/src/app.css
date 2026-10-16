@@ -221,6 +221,13 @@ kbd {
   grid-template-columns: 226px minmax(0, 1fr);
   background: var(--bg);
 }
+.agent-host {
+  height: 100%;
+  overflow: auto;
+}
+.agent-host[hidden] {
+  display: none;
+}
 .sidebar {
   background: var(--sidebar);
   border-right: 1px solid var(--line);
@@ -1436,6 +1443,20 @@ kbd {
   }
   .reading-content > .eyebrow {
     line-height: 1.7;
+  }
+}
+@media (max-height: 560px) {
+  .brand {
+    padding-bottom: 10px;
+  }
+  .main-nav {
+    padding-bottom: 6px;
+  }
+  .sidebar .main-nav button {
+    padding-block: 6px;
+  }
+  .section-toggle {
+    padding-block: 7px;
   }
 }
 @media (prefers-color-scheme: dark) {

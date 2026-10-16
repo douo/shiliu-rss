@@ -27,7 +27,8 @@
     navOpen,
     isMobile,
     onsource,
-    sourceHref
+    sourceHref,
+    returnToReport = false
   }: {
     article: Article;
     feed?: Feed;
@@ -37,6 +38,7 @@
     isMobile: boolean;
     onsource: (e: MouseEvent, id: string) => void;
     sourceHref: string;
+    returnToReport?: boolean;
     onclose: () => void;
     onpatch: (p: ArticlePatch) => Promise<void>;
     onmove: (n: number) => void;
@@ -120,8 +122,12 @@
           size={19}
         />{/if}</button
     >
-    <button onclick={onclose} class="icon-button" aria-label="返回列表 (Esc)" title="返回列表 (Esc)"
-      ><ArrowLeft size={19} /></button
+    <button
+      onclick={onclose}
+      class={returnToReport ? 'text-button' : 'icon-button'}
+      aria-label={returnToReport ? '返回晨报 (Esc)' : '返回列表 (Esc)'}
+      title={returnToReport ? '返回晨报 (Esc)' : '返回列表 (Esc)'}
+      ><ArrowLeft size={19} />{#if returnToReport}<span>返回晨报</span>{/if}</button
     ><span class="toolbar-spacer"></span><button
       onclick={() => onmove(-1)}
       class="icon-button"

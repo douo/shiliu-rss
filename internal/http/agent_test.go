@@ -1,11 +1,44 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"shiliu-rss/internal/app"
 	"strings"
 	"testing"
 )
+
+func TestReportReadHTTP(t *testing.T) {
+	s, srv := testServer(t)
+	ctx := context.Background()
+	v := app.DefaultAgentSettings()
+	v.Enabled, v.BaseURL, v.Model = true, "http://localhost:1234/v1", "synthetic"
+	if _, e := s.App.SaveAgentSettings(ctx, v, nil); e != nil {
+		t.Fatal(e)
+	}
+	run, e := s.App.QueueAgentRun(ctx, "report", "{}", "")
+	if e != nil {
+		t.Fatal(e)
+	}
+	path := "/api/v1/agent/reports/" + run.ID + "/read"
+	cookie, csrf := login(t, srv)
+	for _, tc := range []struct {
+		cookie, csrf string
+		code         int
+	}{{"", "", 401}, {cookie, "", 403}, {cookie, csrf, 409}} {
+		code, _, body := call(t, srv, "POST", path, nil, tc.cookie, tc.csrf, "")
+		if code != tc.code {
+			t.Fatal(code, string(body))
+		}
+	}
+	if _, e = s.App.ControlAgentRun(ctx, run.ID, "cancel"); e != nil {
+		t.Fatal(e)
+	}
+	code, _, body := call(t, srv, "POST", path, nil, cookie, csrf, "")
+	if code != 200 || !strings.Contains(string(body), `"marked_read":0`) {
+		t.Fatal(code, string(body))
+	}
+}
 
 func TestAgentConfigurationAsyncAPIAndExternalAuth(t *testing.T) {
 	_, srv := testServer(t)

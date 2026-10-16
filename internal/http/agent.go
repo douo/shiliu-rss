@@ -137,6 +137,17 @@ func (s *Server) AgentListMembers(ctx context.Context, r api.AgentListMembersReq
 	}
 	return convert[api.AgentListMembers200JSONResponse](v)
 }
+func (s *Server) AgentMarkReportRead(ctx context.Context, r api.AgentMarkReportReadRequestObject) (api.AgentMarkReportReadResponseObject, error) {
+	ctx, e := idempotent(ctx, r.Params.IdempotencyKey, "agent:report-read:"+r.Id, r.Id)
+	if e != nil {
+		return nil, e
+	}
+	v, e := s.App.MarkAgentReportRead(ctx, r.Id)
+	if e != nil {
+		return nil, e
+	}
+	return convert[api.AgentMarkReportRead200JSONResponse](v)
+}
 func (s *Server) AgentSubmitReport(ctx context.Context, r api.AgentSubmitReportRequestObject) (api.AgentSubmitReportResponseObject, error) {
 	if r.Body == nil {
 		return nil, app.ErrInvalid

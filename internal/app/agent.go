@@ -279,7 +279,11 @@ func scanAgentRun(row scanner) (AgentRun, error) {
 	return v, e
 }
 func (s *Service) GetAgentRun(ctx context.Context, runID string) (AgentRun, error) {
-	return scanAgentRun(s.Store.Read.QueryRowContext(ctx, `SELECT `+agentRunCols+` FROM agent_runs WHERE id=?`, runID))
+	v, e := scanAgentRun(s.Store.Read.QueryRowContext(ctx, `SELECT `+agentRunCols+` FROM agent_runs WHERE id=?`, runID))
+	if e == nil && v.Kind == "report" {
+		v.Result.Counts, e = s.AgentCounts(ctx, runID)
+	}
+	return v, e
 }
 func (s *Service) ListAgentRuns(ctx context.Context, kind, before string, limit int) ([]AgentRun, error) {
 	if limit == 0 {

@@ -227,6 +227,11 @@ type AgentQuery struct {
 	ReportId *string `json:"report_id,omitempty"`
 }
 
+// AgentReadResult defines model for AgentReadResult.
+type AgentReadResult struct {
+	MarkedRead int `json:"marked_read"`
+}
+
 // AgentResult defines model for AgentResult.
 type AgentResult struct {
 	Blocks   []AgentBlock     `json:"blocks"`
@@ -591,6 +596,11 @@ type AgentListMembersParams struct {
 	Limit  *int    `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// AgentMarkReportReadParams defines parameters for AgentMarkReportRead.
+type AgentMarkReportReadParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
 // AgentListRunsParams defines parameters for AgentListRuns.
 type AgentListRunsParams struct {
 	Kind   *string `form:"kind,omitempty" json:"kind,omitempty"`
@@ -723,6 +733,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/agent/reports/{id}/members)
 	AgentListMembers(w http.ResponseWriter, r *http.Request, id string, params AgentListMembersParams)
+
+	// (POST /api/v1/agent/reports/{id}/read)
+	AgentMarkReportRead(w http.ResponseWriter, r *http.Request, id string, params AgentMarkReportReadParams)
 
 	// (PUT /api/v1/agent/reports/{id}/result)
 	AgentSubmitReport(w http.ResponseWriter, r *http.Request, id string)
@@ -1204,6 +1217,60 @@ func (siw *ServerInterfaceWrapper) AgentListMembers(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.AgentListMembers(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AgentMarkReportRead operation middleware
+func (siw *ServerInterfaceWrapper) AgentMarkReportRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params AgentMarkReportReadParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AgentMarkReportRead(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2314,6 +2381,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/queries", wrapper.AgentQuery)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/report-runs", wrapper.AgentCreateReport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/reports/{id}/members", wrapper.AgentListMembers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/api/v1/agent/reports/{id}/read", wrapper.AgentMarkReportRead)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/api/v1/agent/reports/{id}/result", wrapper.AgentSubmitReport)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/runs", wrapper.AgentListRuns)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/api/v1/agent/runs/{id}", wrapper.AgentGetRun)
@@ -3531,6 +3599,155 @@ func (response AgentListMembers500ApplicationProblemPlusJSONResponse) VisitAgent
 type AgentListMembers503ApplicationProblemPlusJSONResponse Problem
 
 func (response AgentListMembers503ApplicationProblemPlusJSONResponse) VisitAgentListMembersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportReadRequestObject struct {
+	Id     string `json:"id"`
+	Params AgentMarkReportReadParams
+}
+
+type AgentMarkReportReadResponseObject interface {
+	VisitAgentMarkReportReadResponse(w http.ResponseWriter) error
+}
+
+type AgentMarkReportRead200JSONResponse AgentReadResult
+
+func (response AgentMarkReportRead200JSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead400ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead400ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead401ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead401ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead403ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead403ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead404ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead404ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead409ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead409ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead412ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead412ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(412)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead429ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead429ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead500ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead500ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(500)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AgentMarkReportRead503ApplicationProblemPlusJSONResponse Problem
+
+func (response AgentMarkReportRead503ApplicationProblemPlusJSONResponse) VisitAgentMarkReportReadResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -8579,6 +8796,9 @@ type StrictServerInterface interface {
 	// (GET /api/v1/agent/reports/{id}/members)
 	AgentListMembers(ctx context.Context, request AgentListMembersRequestObject) (AgentListMembersResponseObject, error)
 
+	// (POST /api/v1/agent/reports/{id}/read)
+	AgentMarkReportRead(ctx context.Context, request AgentMarkReportReadRequestObject) (AgentMarkReportReadResponseObject, error)
+
 	// (PUT /api/v1/agent/reports/{id}/result)
 	AgentSubmitReport(ctx context.Context, request AgentSubmitReportRequestObject) (AgentSubmitReportResponseObject, error)
 
@@ -8946,6 +9166,33 @@ func (sh *strictHandler) AgentListMembers(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(AgentListMembersResponseObject); ok {
 		if err := validResponse.VisitAgentListMembersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AgentMarkReportRead operation middleware
+func (sh *strictHandler) AgentMarkReportRead(w http.ResponseWriter, r *http.Request, id string, params AgentMarkReportReadParams) {
+	var request AgentMarkReportReadRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AgentMarkReportRead(ctx, request.(AgentMarkReportReadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AgentMarkReportRead")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AgentMarkReportReadResponseObject); ok {
+		if err := validResponse.VisitAgentMarkReportReadResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

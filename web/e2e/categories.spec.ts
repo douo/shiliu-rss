@@ -100,7 +100,7 @@ async function mockCategories(page: Page, stale = false) {
 }
 
 async function openCategories(page: Page, mobile: boolean) {
-  await page.goto('/');
+  await page.goto('/?scope=recent');
   if (mobile) await page.getByRole('button', { name: '打开导航', exact: true }).click();
   if (!mobile) {
     await page.getByRole('button', { name: '设置与授权', exact: true }).click();

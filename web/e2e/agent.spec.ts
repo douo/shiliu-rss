@@ -71,6 +71,7 @@ test('Agent: configure, report citations, and first chat message', async ({ page
       method = req.method();
     let body: unknown = {};
     if (path === '/api/v1/session') body = { authenticated: true, csrf_token: 'synthetic-csrf' };
+    else if (path === '/api/v1/feeds' || path === '/api/v1/categories') body = [];
     else if (path === '/api/v1/agent/settings') {
       if (method === 'PUT') {
         const input = req.postDataJSON();
@@ -132,7 +133,7 @@ test('Agent: configure, report citations, and first chat message', async ({ page
   await expect(page.getByText('合成索引项目改为增量更新。')).toBeVisible();
   await expect(page.getByRole('link', { name: '合成索引文章' })).toHaveAttribute(
     'href',
-    '/?scope=all&article=1'
+    '/?scope=all&article=1&report=1&anchor=overview-b0-c0'
   );
   await page.getByRole('button', { name: '对话', exact: true }).click();
   await page.getByLabel('向阅读助理提问').fill('SQLite 更新了什么？');
@@ -143,4 +144,173 @@ test('Agent: configure, report citations, and first chat message', async ({ page
     true
   );
   await page.screenshot({ path: `test-results/${info.project.name}-agent.png`, fullPage: true });
+});
+
+test('morning report is home, citations return to their place, and mark-read covers the report', async ({
+  page
+}, info) => {
+  const blocks = Array.from({ length: 45 }, (_, i) => ({
+    kind: 'fact',
+    text: `合成晨报段落 ${i}。${'这一段用于验证长晨报中的阅读位置。'.repeat(8)}`,
+    evidence_ids: [`a${i}`],
+    citations: [
+      {
+        article_id: '99',
+        title: `引用文章 ${i}`,
+        url: '/?scope=all&article=99',
+        basis_hash: 'synthetic',
+        kind: 'feed_excerpt'
+      }
+    ]
+  }));
+  const counts = {
+    total: 65,
+    summarized: 63,
+    reused: 1,
+    fallback: 1,
+    pending: 0,
+    summarized_articles: 64,
+    unread_summarized: 64
+  };
+  const report: AgentRun = {
+    id: '7',
+    kind: 'report',
+    state: 'partial',
+    error: '',
+    conversation_id: '',
+    high_watermark: '65',
+    config_version: 2,
+    total: 65,
+    completed: 65,
+    cutoff: now,
+    created_at: now,
+    updated_at: now,
+    due_at: now,
+    result: {
+      blocks: [],
+      groups: [
+        {
+          id: 'source',
+          title: '合成来源',
+          category_id: '1',
+          category_title: '技术',
+          importance: 'normal',
+          total: 65,
+          blocks
+        }
+      ],
+      counts,
+      trace: [],
+      degraded: true
+    }
+  };
+  const article = {
+    id: '99',
+    feed_id: 'source',
+    feed_title: '合成来源',
+    title: '感兴趣的文章',
+    url: 'https://example.test/99',
+    author: '',
+    published_at: now,
+    first_seen_at: now,
+    read_at: null as string | null,
+    favorite: false,
+    hidden: false,
+    removed: false,
+    note: '',
+    tags: [],
+    version: 1,
+    body_state: 'available',
+    content_hash: 'synthetic',
+    provenance: 'feed',
+    read_at_unknown: false,
+    imported_at: null,
+    protection_until: null,
+    content_expires_at: null,
+    content: [
+      {
+        kind: 'feed',
+        html: '<p>合成正文，仅用于本机验证。</p>',
+        text: '合成正文',
+        hash: 'synthetic',
+        state: 'available',
+        obtained_at: now,
+        expires_at: null
+      }
+    ],
+    artifacts: []
+  };
+  let marked = 0;
+  await page.route('**/api/v1/**', async (route) => {
+    const req = route.request(),
+      path = new URL(req.url()).pathname;
+    let body: unknown;
+    if (path === '/api/v1/session') body = { authenticated: true, csrf_token: 'synthetic' };
+    else if (['/api/v1/feeds', '/api/v1/categories', '/api/v1/agent/conversations'].includes(path))
+      body = [];
+    else if (path === '/api/v1/agent/settings') body = { enabled: true };
+    else if (path === '/api/v1/agent/runs') body = [report];
+    else if (path === '/api/v1/agent/runs/7') body = report;
+    else if (path === '/api/v1/agent/reports/7/read') {
+      expect(req.method()).toBe('POST');
+      expect(req.headers()['idempotency-key']).toBeTruthy();
+      expect(req.headers()['x-csrf-token']).toBe('synthetic');
+      marked += 1;
+      counts.unread_summarized = 0;
+      body = { marked_read: 64 };
+    } else if (path === '/api/v1/articles/99') {
+      if (req.method() === 'PATCH') {
+        article.read_at = now;
+        article.version++;
+      }
+      body = article;
+    } else if (path === '/api/v1/articles')
+      body = { items: [], high_watermark: '1', next_cursor: '' };
+    else throw new Error(`Unexpected request: ${path}`);
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: '晨报 · Agent', exact: true })).toBeVisible();
+  if (info.project.name === 'mobile')
+    await page.getByRole('button', { name: '打开导航', exact: true }).click();
+  const nav = page.getByRole('navigation', { name: '阅读导航', exact: true });
+  await expect(nav.getByRole('button').first()).toHaveText('晨报 · Agent');
+  if (info.project.name === 'mobile') await page.keyboard.press('Escape');
+  const citation = page.getByRole('link', { name: '引用文章 35', exact: true });
+  await citation.scrollIntoViewIfNeeded();
+  const position = await page.locator('.agent-host').evaluate((el) => el.scrollTop);
+  expect(position).toBeGreaterThan(1000);
+  await citation.click();
+  await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '返回晨报 (Esc)', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '返回晨报 (Esc)', exact: true }).click();
+  await expect(citation).toBeFocused();
+  expect(
+    Math.abs((await page.locator('.agent-host').evaluate((el) => el.scrollTop)) - position)
+  ).toBeLessThan(3);
+  await citation.click();
+  await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(citation).toBeFocused();
+  await citation.click();
+  await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+  await page.getByRole('button', { name: '返回晨报 (Esc)', exact: true }).click();
+  await expect(citation).toBeInViewport();
+  await citation.click();
+  await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
+  await page.goBack();
+  await expect(citation).toBeInViewport();
+  await page.getByRole('button', { name: /总结文章标为已读/ }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: '已将 64 篇总结文章标为已读' })
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: /总结文章标为已读/ })).toBeDisabled();
+  expect(marked).toBe(1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({
+    path: `test-results/${info.project.name}-morning-report.png`,
+    fullPage: true
+  });
 });

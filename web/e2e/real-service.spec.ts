@@ -33,7 +33,7 @@ test('real API: subscription → background ingestion → reading → full text 
     if (message.type() === 'error' && /Content Security Policy|script-src/.test(message.text()))
       cspErrors.push(message.text());
   });
-  const startup = await page.goto('/');
+  const startup = await page.goto('/?scope=recent');
   if (process.env.SHILIU_E2E_URL) {
     expect(startup?.headers()['content-security-policy']).toContain("script-src 'self'");
     expect(startup?.headers()['content-encoding']).toBe('gzip');
