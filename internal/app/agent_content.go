@@ -173,6 +173,24 @@ func (s *Service) AgentGroups(ctx context.Context, runID string) ([]AgentGroup, 
 	return out, rows.Err()
 }
 
+func (s *Service) agentGroupUnreadCounts(ctx context.Context, runID string) (map[string]int, error) {
+	rows, e := s.Store.Read.QueryContext(ctx, `SELECT m.feed_id,count(*) FROM report_members m JOIN articles a ON a.id=m.article_id WHERE m.run_id=? AND a.read_at IS NULL AND a.removed=0 AND `+summarizedMember+` GROUP BY m.feed_id`, runID)
+	if e != nil {
+		return nil, e
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var id string
+		var unread int
+		if e = rows.Scan(&id, &unread); e != nil {
+			return nil, e
+		}
+		out[id] = unread
+	}
+	return out, rows.Err()
+}
+
 // Only a fresh important-source policy may create automatic fulltext work.
 // A prior attempt (including a failed attempt) is reused, never restarted daily.
 func (s *Service) AgentFulltext(ctx context.Context, run AgentRun, articleID string) (Job, error) {

@@ -17,6 +17,19 @@ type AgentReadResult struct {
 // MarkAgentReportRead applies to the finished report's fixed, summarized members,
 // including archived articles, without affecting later arrivals or coverage gaps.
 func (s *Service) MarkAgentReportRead(ctx context.Context, runID string) (AgentReadResult, error) {
+	return s.markAgentReportRead(ctx, runID, "")
+}
+
+// MarkAgentReportGroupRead limits the operation to a source group in the fixed
+// report snapshot, even if the source has since moved to another category.
+func (s *Service) MarkAgentReportGroupRead(ctx context.Context, runID, groupID string) (AgentReadResult, error) {
+	if groupID == "" {
+		return AgentReadResult{}, ErrInvalid
+	}
+	return s.markAgentReportRead(ctx, runID, groupID)
+}
+
+func (s *Service) markAgentReportRead(ctx context.Context, runID, groupID string) (AgentReadResult, error) {
 	out := AgentReadResult{}
 	e := s.write(ctx, func(tx *sql.Tx) error {
 		saved, e := s.idempotentResult(ctx, tx)
@@ -40,7 +53,21 @@ func (s *Service) MarkAgentReportRead(ctx context.Context, runID string) (AgentR
 		if state == "queued" || state == "running" || state == "waiting_retry" {
 			return ErrConflict
 		}
-		rows, e := tx.QueryContext(ctx, `SELECT a.id,a.version FROM report_members m JOIN articles a ON a.id=m.article_id WHERE m.run_id=? AND a.read_at IS NULL AND a.removed=0 AND `+summarizedMember, runID)
+		if groupID != "" {
+			var exists int
+			if e = tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM report_members WHERE run_id=? AND feed_id=?)`, runID, groupID).Scan(&exists); e != nil {
+				return e
+			}
+			if exists == 0 {
+				return ErrNotFound
+			}
+		}
+		where, args := "", []any{runID}
+		if groupID != "" {
+			where = " AND m.feed_id=?"
+			args = append(args, groupID)
+		}
+		rows, e := tx.QueryContext(ctx, `SELECT a.id,a.version FROM report_members m JOIN articles a ON a.id=m.article_id WHERE m.run_id=?`+where+` AND a.read_at IS NULL AND a.removed=0 AND `+summarizedMember, args...)
 		if e != nil {
 			return e
 		}

@@ -67,7 +67,7 @@ Agent 队列独立于 feed/fulltext 队列；一个模型槽，对话优先。�
 | `GET /runs?kind=report&before=...`、`GET /runs/{id}` | 历史元数据、任务/报告详情 |
 | `POST /runs/{id}/control` | `action=cancel/retry`，保留已完成步骤 |
 | `GET /reports/{id}/members?after=...&limit=...` | 固定成员与卡片，最多200项 |
-| `POST /reports/{id}/read` | 对已结束报告的实质摘要成员幂等标读，不包含失败提示或待处理成员 |
+| `POST /reports/{id}/read` | 对已结束报告的实质摘要成员幂等标读；可选 group_id 限定固定来源分组，不包含失败提示或待处理成员 |
 | `PUT /reports/{id}/result` | 外部提交结构化报告；验证成员/hash/分组/内部引用，不能伪造覆盖数 |
 | `GET/POST /conversations` | 会话历史/新建，可关联 report_id |
 | `GET/POST /conversations/{id}/messages` | 消息分页/幂等发送 |

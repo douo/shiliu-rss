@@ -5464,7 +5464,7 @@
     "/api/v1/agent/reports/{id}/read": {
       "post": {
         "operationId": "agentMarkReportRead",
-        "description": "Mark only the finished report’s successfully summarized or reused articles as read. Includes substantive excerpt fallbacks; excludes pending, unavailable, limitation-only cards and later arrivals. Atomic; supports idempotency. Running reports return 409.",
+        "description": "Mark the finished report’s summarized articles as read. With group_id, limit the operation to that fixed source group (AgentGroup.id); an unknown group returns 404 and an empty group_id returns 400. Without group_id, retain the whole-report behavior. Includes substantive excerpt fallbacks; excludes pending, unavailable, limitation-only cards, removed articles and later arrivals. Atomic; supports idempotency including group scope. Running reports return 409.",
         "security": [
           {
             "sessionCookie": []
@@ -5590,6 +5590,16 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "query",
+            "required": false,
+            "description": "Optional fixed source group ID from result.groups[].id. When supplied, only this group is marked read.",
+            "schema": {
+              "type": "string",
+              "minLength": 1
             }
           }
         ]
@@ -6702,6 +6712,12 @@
             "items": {
               "$ref": "#/components/schemas/AgentBlock"
             }
+          },
+          "unread_summarized": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true,
+            "description": "Current unread articles in this fixed report group with substantive summary cards, excluding removed articles. Recomputed when fetching report details."
           }
         },
         "required": [

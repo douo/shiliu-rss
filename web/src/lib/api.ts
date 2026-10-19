@@ -176,10 +176,14 @@ export const api = {
         params: { path: { id }, query: { after, limit: 50 } }
       })
     ),
-  agentMarkRead: (id: string) =>
+  agentMarkRead: (id: string, groupId: string) =>
     data(
       client.POST('/api/v1/agent/reports/{id}/read', {
-        params: { path: { id }, header: { 'Idempotency-Key': crypto.randomUUID() } }
+        params: {
+          path: { id },
+          query: { group_id: groupId },
+          header: { 'Idempotency-Key': crypto.randomUUID() }
+        }
       })
     ),
   agentConversations: (before = '') =>

@@ -52,7 +52,7 @@
 | GET `/runs`、GET `/runs/{id}` | 历史、进度及结果；模型任务返回202后轮询 |
 | POST `/runs/{id}/control` | cancel/retry；复用已完成步骤 |
 | GET `/reports/{id}/members` | 固定成员分页及处理深度/卡片 |
-| POST `/reports/{id}/read` | 当前已结束报告的实质摘要成员标已读；必需 Idempotency-Key，返回 marked_read；运行中409 |
+| POST `/reports/{id}/read` | 已结束报告的实质摘要成员标已读；可选 group_id 限定来源分组，省略则整份报告；必需 Idempotency-Key，返回 marked_read；运行中409 |
 | PUT `/reports/{id}/result` | 外部结构化汇报；校验成员/hash/分组并重建内部引用 |
 | GET/POST `/conversations` | 会话列表与创建，可关联报告 |
 | GET/POST `/conversations/{id}/messages` | 历史与幂等消息 |
@@ -60,6 +60,6 @@
 
 外部汇报先建报告快照并取消内置执行；正在执行时拒绝覆盖。外部报告标记 partial，覆盖数由成员账本计算，不能自报已读全文。引用路径由服务端以文章 ID 构造，模型不能提供任意链接。文章、检索片段与用户引用资料均作为外部内容，不具有系统指令权。
 
-报告详情的 `result.counts` 从当前成员账本读取，新增 `summarized_articles`（存在事实/分析卡片的可阅读成员数）及 `unread_summarized`（其中当前仍未读数）。批量已读包含 summarized/reused 和有实质摘要的 fallback，排除仅 limitation 的格式失败卡片、pending、unavailable、removed；不改正文、收藏、笔记和标签。重复幂等键返回原结果，不覆盖操作后用户主动标回未读的决定；新一次显式操作可使用新键。外部只上传报告文本不认证逐篇卡片覆盖，因此不凭外部自报的引用扩大批量已读范围。
+报告详情的 `result.counts` 从当前成员账本读取，新增 `summarized_articles`（存在事实/分析卡片的可阅读成员数）及 `unread_summarized`（其中当前仍未读数）。各 `result.groups[]` 的只读 `unread_summarized` 同样从本组固定成员及当前阅读状态实时计算。网页按分组调用 `POST /reports/{id}/read?group_id=<group.id>`；空分组值返回400，不属于本报告的分组返回404，同幂等键更换组返回409。批量已读包含 summarized/reused 和有实质摘要的 fallback，排除仅 limitation 的格式失败卡片、pending、unavailable、removed；不改正文、收藏、笔记和标签。重复幂等键返回原结果，不覆盖操作后用户主动标回未读的决定；新一次显式操作可使用新键。外部只上传报告文本不认证逐篇卡片覆盖，因此不凭外部自报的引用扩大批量已读范围。
 
 报告`result.trace`也包含运行诊断：新聚合失败记录来源ID、分批/层次归并阶段和稳定错误码，展示被限制为前8个块时明确标记。此字段不包含模型原始响应、Key或请求资料；旧报告未记录的原因不会由UI推断补造。`completed`为成员处理进度，`counts.summarized_articles`才是符合实质摘要判定的文章数量，两者不能混用。页内报告提问复用conversations/messages API，仅在第一条问题时创建关联report_id的会话。

@@ -51,13 +51,14 @@ type AgentBlock struct {
 	Citations   []AgentCitation `json:"citations"`
 }
 type AgentGroup struct {
-	ID            string       `json:"id"`
-	Title         string       `json:"title"`
-	CategoryID    string       `json:"category_id"`
-	CategoryTitle string       `json:"category_title"`
-	Importance    string       `json:"importance"`
-	Total         int          `json:"total"`
-	Blocks        []AgentBlock `json:"blocks"`
+	ID               string       `json:"id"`
+	Title            string       `json:"title"`
+	CategoryID       string       `json:"category_id"`
+	CategoryTitle    string       `json:"category_title"`
+	Importance       string       `json:"importance"`
+	Total            int          `json:"total"`
+	UnreadSummarized int          `json:"unread_summarized"`
+	Blocks           []AgentBlock `json:"blocks"`
 }
 type AgentResult struct {
 	Blocks   []AgentBlock   `json:"blocks"`
@@ -282,6 +283,13 @@ func (s *Service) GetAgentRun(ctx context.Context, runID string) (AgentRun, erro
 	v, e := scanAgentRun(s.Store.Read.QueryRowContext(ctx, `SELECT `+agentRunCols+` FROM agent_runs WHERE id=?`, runID))
 	if e == nil && v.Kind == "report" {
 		v.Result.Counts, e = s.AgentCounts(ctx, runID)
+		if e == nil && len(v.Result.Groups) > 0 {
+			var unread map[string]int
+			unread, e = s.agentGroupUnreadCounts(ctx, runID)
+			for i := range v.Result.Groups {
+				v.Result.Groups[i].UnreadSummarized = unread[v.Result.Groups[i].ID]
+			}
+		}
 	}
 	return v, e
 }

@@ -138,11 +138,23 @@ func (s *Server) AgentListMembers(ctx context.Context, r api.AgentListMembersReq
 	return convert[api.AgentListMembers200JSONResponse](v)
 }
 func (s *Server) AgentMarkReportRead(ctx context.Context, r api.AgentMarkReportReadRequestObject) (api.AgentMarkReportReadResponseObject, error) {
-	ctx, e := idempotent(ctx, r.Params.IdempotencyKey, "agent:report-read:"+r.Id, r.Id)
+	var input any = r.Id
+	if r.Params.GroupId != nil {
+		if *r.Params.GroupId == "" {
+			return nil, app.ErrInvalid
+		}
+		input = map[string]string{"report_id": r.Id, "group_id": *r.Params.GroupId}
+	}
+	ctx, e := idempotent(ctx, r.Params.IdempotencyKey, "agent:report-read:"+r.Id, input)
 	if e != nil {
 		return nil, e
 	}
-	v, e := s.App.MarkAgentReportRead(ctx, r.Id)
+	var v app.AgentReadResult
+	if r.Params.GroupId != nil {
+		v, e = s.App.MarkAgentReportGroupRead(ctx, r.Id, *r.Params.GroupId)
+	} else {
+		v, e = s.App.MarkAgentReportRead(ctx, r.Id)
+	}
 	if e != nil {
 		return nil, e
 	}

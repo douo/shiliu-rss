@@ -31,8 +31,9 @@
     tab = $state('reports'),
     busy = $state(false),
     error = $state(''),
-    notice = $state(''),
     settings = $state<AgentSettings | null>(null);
+  let readFeedback = $state<Record<string, { message: string; failed: boolean }>>({});
+  let readingGroup = $state('');
   let runs = $state<AgentRun[]>([]),
     report = $state<AgentRun | null>(null),
     members = $state<AgentMember[]>([]),
@@ -140,7 +141,7 @@
     if (report?.id !== id) reportChatOpen = false;
     report = loaded;
     loadedReport = id;
-    notice = '';
+    readFeedback = {};
     members = [];
     showMembers = false;
     onreport(id);
@@ -160,14 +161,31 @@
     members = [];
     loadedReport = report.id;
     onreport(report.id);
-    notice = '';
+    readFeedback = {};
   }
-  async function markReportRead() {
+  async function markGroupRead(groupId: string) {
     if (!report) return;
-    const result = await api.agentMarkRead(report.id);
-    notice = `已将 ${result.marked_read} 篇总结文章标为已读`;
-    await onreadchange();
-    report = await api.agentRun(report.id);
+    const id = report.id;
+    readingGroup = groupId;
+    delete readFeedback[groupId];
+    try {
+      const result = await api.agentMarkRead(id, groupId);
+      if (report?.id === id) {
+        readFeedback[groupId] = {
+          message: `已将本组 ${result.marked_read} 篇总结文章标为已读`,
+          failed: false
+        };
+      }
+      const updated = await api.agentRun(id);
+      if (report?.id === id) report = updated;
+      await onreadchange();
+    } catch (e) {
+      if (report?.id === id) {
+        readFeedback[groupId] = { message: (e as Error).message, failed: true };
+      }
+    } finally {
+      readingGroup = '';
+    }
   }
   async function control(action: 'cancel' | 'retry') {
     if (report) report = await api.agentControl(report.id, action);
@@ -363,10 +381,10 @@
                 >
                   {group.category_title}
                 </h2>{/if}
-              <article class="source-group">
-                <h3>
+              <article class="source-group" aria-labelledby={`source-heading-${group.id}`}>
+                <h3 id={`source-heading-${group.id}`}>
                   {group.title}
-                  <small>{importanceName[group.importance]} · {group.total} 篇未读</small>
+                  <small>{importanceName[group.importance]} · {group.total} 篇</small>
                 </h3>
                 <AgentBlocks
                   diagnosticReport={report}
@@ -376,44 +394,48 @@
                   prefix={`source-${group.id}`}
                   {onarticle}
                 />{#if !group.blocks?.length}<p class="muted">本来源尚无已完成的摘要。</p>{/if}
+                <footer>
+                  <div class="report-read-action">
+                    <button
+                      class="button secondary"
+                      disabled={busy || activeState(report) || !group.unread_summarized}
+                      onclick={() => action(() => markGroupRead(group.id))}
+                      ><CheckCheck
+                        size={16}
+                        aria-hidden="true"
+                      />{#if readingGroup === group.id}标记中…{:else}本组文章标为已读{#if group.unread_summarized}（{group.unread_summarized}）{/if}{/if}</button
+                    >
+                    <HoverDetails label="已读范围与技术说明" heading="本组文章批量已读 · 执行范围">
+                      <p>仅处理“{group.title}”分组已总结的文章，其他分组保留原状态。</p>
+                      <h4>成员判定</h4>
+                      <p>
+                        以服务端固定报告中的本组成员为准，覆盖所有分页和归档。成员需处于
+                        summarized、reused 或 fallback
+                        状态，且卡片包含非空的事实或分析块；有实质摘要的正文降级仍可纳入。
+                      </p>
+                      <p>
+                        报告外新到的文章、pending、unavailable、已移除和仅 limitation
+                        提示的文章排除。本组当前符合条件且仍未读：{group.unread_summarized ?? 0} 篇。
+                      </p>
+                      <h4>执行与重试</h4>
+                      <p>
+                        任务排队、处理中或等待重试时禁用操作。服务端在同一事务内更新阅读状态、版本和变更记录；已读文章跳过。同一幂等请求重试不会覆盖之后主动设为未读的选择。
+                      </p>
+                    </HoverDetails>
+                  </div>
+                  {#if readFeedback[group.id]}<p
+                      class:notice={!readFeedback[group.id].failed}
+                      class:error={readFeedback[group.id].failed}
+                      role={readFeedback[group.id].failed ? 'alert' : 'status'}
+                    >
+                      {readFeedback[group.id].message}
+                    </p>{/if}
+                </footer>
               </article>{/each}
             <footer class="report-footer" role="group" aria-label="晨报末尾操作">
               <div class="report-end">
                 <span></span><small>本份晨报到这里结束</small><span></span>
               </div>
-              <div class="report-read-action">
-                <button
-                  class="button"
-                  disabled={busy ||
-                    activeState(report) ||
-                    !report.result?.counts?.unread_summarized}
-                  onclick={() => action(markReportRead)}
-                  ><CheckCheck
-                    size={16}
-                    aria-hidden="true"
-                  />总结文章标为已读{#if report.result?.counts?.unread_summarized}（{report.result
-                      .counts.unread_summarized}）{/if}</button
-                >
-                <HoverDetails label="已读范围与技术说明" heading="总结文章批量已读 · 执行范围">
-                  <p>仅处理本份晨报已总结的文章；未处理、不可用和只有失败提示的文章保留未读。</p>
-                  <h4>成员判定</h4>
-                  <p>
-                    以服务端固定报告成员为准，覆盖所有分页和归档。成员需处于 summarized、reused 或
-                    fallback 状态，且卡片包含非空的事实或分析块；有实质摘要的正文降级仍可纳入。
-                  </p>
-                  <p>
-                    报告外新到的文章、pending、unavailable、已移除和仅 limitation
-                    提示的文章排除。当前符合条件且仍未读：{report.result?.counts
-                      ?.unread_summarized ?? '未记录'} 篇。
-                  </p>
-                  <h4>执行与重试</h4>
-                  <p>
-                    任务排队、处理中或等待重试时禁用操作。服务端在同一事务内更新阅读状态、版本和变更记录；已读文章跳过。同一幂等请求重试不会覆盖之后主动设为未读的选择。
-                  </p>
-                  <p>本操作不删除文章、不取消收藏，也不会把报告外的未读内容一起处理。</p>
-                </HoverDetails>
-              </div>
-              {#if notice}<p class="notice read-notice" role="status">{notice}</p>{/if}
               <HoverDetails label="覆盖统计与技术报告" heading="晨报生成 · 技术报告"
                 ><ReportDiagnostics {report} /></HoverDetails
               >

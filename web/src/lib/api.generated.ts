@@ -535,7 +535,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Mark only the finished report’s successfully summarized or reused articles as read. Includes substantive excerpt fallbacks; excludes pending, unavailable, limitation-only cards and later arrivals. Atomic; supports idempotency. Running reports return 409. */
+        /** @description Mark the finished report’s summarized articles as read. With group_id, limit the operation to that fixed source group (AgentGroup.id); an unknown group returns 404 and an empty group_id returns 400. Without group_id, retain the whole-report behavior. Includes substantive excerpt fallbacks; excludes pending, unavailable, limitation-only cards, removed articles and later arrivals. Atomic; supports idempotency including group scope. Running reports return 409. */
         post: operations["agentMarkReportRead"];
         delete?: never;
         options?: never;
@@ -904,6 +904,11 @@ export interface components {
             /** Format: int64 */
             total: number;
             blocks: components["schemas"]["AgentBlock"][];
+            /**
+             * Format: int64
+             * @description Current unread articles in this fixed report group with substantive summary cards, excluding removed articles. Recomputed when fetching report details.
+             */
+            readonly unread_summarized?: number;
         };
         AgentResult: {
             blocks: components["schemas"]["AgentBlock"][];
@@ -5387,7 +5392,10 @@ export interface operations {
     };
     agentMarkReportRead: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Optional fixed source group ID from result.groups[].id. When supplied, only this group is marked read. */
+                group_id?: string;
+            };
             header: {
                 "Idempotency-Key": string;
             };

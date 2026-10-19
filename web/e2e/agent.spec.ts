@@ -146,7 +146,7 @@ test('Agent: configure, report citations, and first chat message', async ({ page
   await page.screenshot({ path: `test-results/${info.project.name}-agent.png`, fullPage: true });
 });
 
-test('morning report is home, citations return to their place, and mark-read covers the report', async ({
+test('morning report is home, citations return, and each group marks only its own articles read', async ({
   page
 }, info) => {
   const blocks = Array.from({ length: 45 }, (_, i) => ({
@@ -164,24 +164,24 @@ test('morning report is home, citations return to their place, and mark-read cov
     ]
   }));
   const counts = {
-    total: 65,
-    summarized: 63,
+    total: 68,
+    summarized: 65,
     reused: 1,
-    fallback: 1,
+    fallback: 2,
     pending: 0,
-    summarized_articles: 64,
-    unread_summarized: 64
+    summarized_articles: 66,
+    unread_summarized: 66
   };
   const report: AgentRun = {
     id: '7',
     kind: 'report',
-    state: 'partial',
+    state: 'running',
     error: '',
     conversation_id: '',
-    high_watermark: '65',
+    high_watermark: '68',
     config_version: 2,
-    total: 65,
-    completed: 65,
+    total: 68,
+    completed: 68,
     cutoff: now,
     created_at: now,
     updated_at: now,
@@ -203,7 +203,28 @@ test('morning report is home, citations return to their place, and mark-read cov
           category_title: '技术',
           importance: 'normal',
           total: 65,
+          unread_summarized: 64,
           blocks
+        },
+        {
+          id: 'other',
+          title: '第二来源',
+          category_id: '1',
+          category_title: '技术',
+          importance: 'normal',
+          total: 2,
+          unread_summarized: 2,
+          blocks: [{ kind: 'fact', text: '另一分组的合成摘要。', evidence_ids: [], citations: [] }]
+        },
+        {
+          id: 'gap',
+          title: '未完成来源',
+          category_id: '2',
+          category_title: '其他',
+          importance: 'low',
+          total: 1,
+          unread_summarized: 0,
+          blocks: []
         }
       ],
       counts,
@@ -247,7 +268,9 @@ test('morning report is home, citations return to their place, and mark-read cov
     ],
     artifacts: []
   };
-  let marked = 0;
+  const marked: string[] = [];
+  let failRead = true;
+  let feedRefreshes = 0;
   let reportConversations: AgentConversation[] = [];
   let reportMessages: AgentMessage[] = [];
   const reply = {
@@ -266,8 +289,10 @@ test('morning report is home, citations return to their place, and mark-read cov
       path = new URL(req.url()).pathname;
     let body: unknown;
     if (path === '/api/v1/session') body = { authenticated: true, csrf_token: 'synthetic' };
-    else if (['/api/v1/feeds', '/api/v1/categories'].includes(path)) body = [];
-    else if (path === '/api/v1/agent/conversations') {
+    else if (['/api/v1/feeds', '/api/v1/categories'].includes(path)) {
+      if (path.endsWith('/feeds')) feedRefreshes++;
+      body = [];
+    } else if (path === '/api/v1/agent/conversations') {
       if (req.method() === 'POST') {
         expect(req.postDataJSON().report_id).toBe('7');
         const c = { id: 'c7', title: '晨报对话', report_id: '7', created_at: now, updated_at: now };
@@ -305,9 +330,25 @@ test('morning report is home, citations return to their place, and mark-read cov
       expect(req.method()).toBe('POST');
       expect(req.headers()['idempotency-key']).toBeTruthy();
       expect(req.headers()['x-csrf-token']).toBe('synthetic');
-      marked += 1;
-      counts.unread_summarized = 0;
-      body = { marked_read: 64 };
+      const groupId = new URL(req.url()).searchParams.get('group_id');
+      expect(['source', 'other']).toContain(groupId);
+      if (failRead) {
+        failRead = false;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/problem+json',
+          body: JSON.stringify({ detail: '合成暂时失败，请重试' })
+        });
+        return;
+      }
+      const group = report.result.groups.find((g) => g.id === groupId)!;
+      const n = group.unread_summarized!;
+      report.result.groups = report.result.groups.map((g) =>
+        g.id === groupId ? { ...g, unread_summarized: 0 } : g
+      );
+      counts.unread_summarized -= n;
+      marked.push(groupId!);
+      body = { marked_read: n };
     } else if (path === '/api/v1/articles/99') {
       if (req.method() === 'PATCH') {
         article.read_at = now;
@@ -326,6 +367,26 @@ test('morning report is home, citations return to their place, and mark-read cov
   const nav = page.getByRole('navigation', { name: '阅读导航', exact: true });
   await expect(nav.getByRole('button').first()).toHaveText('晨报 · Agent');
   if (info.project.name === 'mobile') await page.keyboard.press('Escape');
+  const source = page.getByRole('article', { name: /^合成来源 / });
+  const other = page.getByRole('article', { name: /^第二来源 / });
+  const gap = page.getByRole('article', { name: /^未完成来源 / });
+  const sourceRead = source.getByRole('button', { name: /本组文章标为已读/ });
+  const otherRead = other.getByRole('button', { name: /本组文章标为已读/ });
+  await expect(page.getByRole('button', { name: /本组文章标为已读/ })).toHaveCount(3);
+  await expect(sourceRead).toBeDisabled();
+  await expect(otherRead).toBeDisabled();
+  report.state = 'partial';
+  await expect(sourceRead).toBeEnabled();
+  await expect(otherRead).toBeEnabled();
+  await expect(gap.getByRole('button', { name: /本组文章标为已读/ })).toBeDisabled();
+  expect(
+    await sourceRead.evaluate(
+      (el) =>
+        el.getBoundingClientRect().top >=
+        el.closest('article')!.querySelector('.agent-block:last-of-type')!.getBoundingClientRect()
+          .bottom
+    )
+  ).toBe(true);
   // Detailed limitations stay out of the reading flow and work with hover, touch and keyboard.
   const diagnostic = page.getByRole('button', { name: '覆盖与处理说明', exact: true });
   const technical = page.getByRole('dialog', { name: '处理限制与技术报告', exact: true });
@@ -334,7 +395,7 @@ test('morning report is home, citations return to their place, and mark-read cov
   else await diagnostic.hover();
   await expect(technical).toBeVisible();
   await expect(technical).toContainText('没有记录具体失败码');
-  await expect(technical).toContainText('65 / 65 篇');
+  await expect(technical).toContainText('68 / 68 篇');
   await expect(technical).toContainText('卡片是派生摘要');
   await page.screenshot({ path: `test-results/${info.project.name}-report-diagnostics.png` });
   const panelBounds = await technical.boundingBox();
@@ -410,18 +471,36 @@ test('morning report is home, citations return to their place, and mark-read cov
   await expect(page.getByRole('article', { name: '文章阅读' })).toBeVisible();
   await page.goBack();
   await expect(citation).toBeInViewport();
-  const readScope = page.getByRole('button', { name: '已读范围与技术说明', exact: true });
+  const readScope = source.getByRole('button', { name: '已读范围与技术说明', exact: true });
   await readScope.scrollIntoViewIfNeeded();
   await readScope.click();
-  const scopePanel = page.getByRole('dialog', { name: '总结文章批量已读 · 执行范围', exact: true });
-  await expect(scopePanel).toContainText('当前符合条件且仍未读：64 篇');
+  const scopePanel = page.getByRole('dialog', { name: '本组文章批量已读 · 执行范围', exact: true });
+  await expect(scopePanel).toContainText('本组当前符合条件且仍未读：64 篇');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: /总结文章标为已读/ }).click();
-  await expect(
-    page.getByRole('status').filter({ hasText: '已将 64 篇总结文章标为已读' })
-  ).toBeVisible();
-  await expect(page.getByRole('button', { name: /总结文章标为已读/ })).toBeDisabled();
-  expect(marked).toBe(1);
+  await sourceRead.click();
+  await expect(source.getByRole('alert')).toHaveText('合成暂时失败，请重试');
+  await expect(sourceRead).toHaveText('本组文章标为已读（64）');
+  await expect(otherRead).toHaveText('本组文章标为已读（2）');
+  expect(marked).toEqual([]);
+  const refreshesBefore = feedRefreshes;
+  await sourceRead.click();
+  await expect(source.getByRole('status')).toHaveText('已将本组 64 篇总结文章标为已读');
+  await expect(source.getByRole('alert')).toHaveCount(0);
+  await expect(sourceRead).toBeDisabled();
+  await expect(otherRead).toBeEnabled();
+  await expect(otherRead).toHaveText('本组文章标为已读（2）');
+  await expect.poll(() => feedRefreshes).toBeGreaterThan(refreshesBefore);
+  expect(marked).toEqual(['source']);
+  await sourceRead.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: `test-results/${info.project.name}-report-group-read.png` });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.screenshot({ path: `test-results/${info.project.name}-report-group-read-dark.png` });
+  await page.emulateMedia({ colorScheme: 'light' });
+  await otherRead.click();
+  await expect(other.getByRole('status')).toHaveText('已将本组 2 篇总结文章标为已读');
+  await expect(otherRead).toBeDisabled();
+  await expect(source.getByRole('status')).toHaveText('已将本组 64 篇总结文章标为已读');
+  expect(marked).toEqual(['source', 'other']);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({
     path: `test-results/${info.project.name}-morning-report.png`,

@@ -187,6 +187,9 @@ type AgentGroup struct {
 	Importance    string       `json:"importance"`
 	Title         string       `json:"title"`
 	Total         int64        `json:"total"`
+
+	// UnreadSummarized Current unread articles in this fixed report group with substantive summary cards, excluding removed articles. Recomputed when fetching report details.
+	UnreadSummarized *int64 `json:"unread_summarized,omitempty"`
 }
 
 // AgentMember defines model for AgentMember.
@@ -604,7 +607,9 @@ type AgentListMembersParams struct {
 
 // AgentMarkReportReadParams defines parameters for AgentMarkReportRead.
 type AgentMarkReportReadParams struct {
-	IdempotencyKey string `json:"Idempotency-Key"`
+	// GroupId Optional fixed source group ID from result.groups[].id. When supplied, only this group is marked read.
+	GroupId        *string `form:"group_id,omitempty" json:"group_id,omitempty"`
+	IdempotencyKey string  `json:"Idempotency-Key"`
 }
 
 // AgentListRunsParams defines parameters for AgentListRuns.
@@ -1249,6 +1254,19 @@ func (siw *ServerInterfaceWrapper) AgentMarkReportRead(w http.ResponseWriter, r 
 
 	// Parameter object where we will unmarshal all parameters from the context
 	var params AgentMarkReportReadParams
+
+	// ------------- Optional query parameter "group_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "group_id", r.URL.Query(), &params.GroupId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "group_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "group_id", Err: err})
+		}
+		return
+	}
 
 	headers := r.Header
 
